@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v15-size-presets'
+const VERSION = 'v16-window-presets'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -10,9 +10,9 @@ const SEARCH_FILTERS = [
   ['playlists', 'Playlists']
 ]
 const PLAYER_SIZES = {
-  small: { label: 'Small', height: 'clamp(220px, 34vh, 300px)' },
-  medium: { label: 'Medium', height: 'clamp(300px, 44vh, 390px)' },
-  large: { label: 'Large', height: 'clamp(390px, 56vh, 520px)' }
+  small: { label: 'Small', width: '500px', height: '500px', player: '281px' },
+  medium: { label: 'Medium', width: '640px', height: '610px', player: '360px' },
+  large: { label: 'Large', width: '760px', height: '720px', player: '427px' }
 }
 const QUALITY_LABELS = { auto: 'Auto', tiny: '144p', small: '240p', medium: '360p', large: '480p', hd720: '720p', hd1080: '1080p', hd1440: '1440p', hd2160: '4K' }
 const fmt = seconds => {
@@ -50,7 +50,7 @@ const focusPlayerScript = '(' + function () {
     ytd-masthead, #masthead-container, #secondary, #comments, #meta, #info, #below, #chat, ytd-merch-shelf-renderer, ytd-engagement-panel-section-list-renderer, .ytp-chrome-top { display:none!important; }
     ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner { margin:0!important; padding:0!important; width:100vw!important; max-width:none!important; }
     #player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container { position:fixed!important; left:0!important; top:0!important; right:0!important; bottom:0!important; width:100vw!important; height:100vh!important; max-height:none!important; min-width:0!important; transform:none!important; z-index:2147483647!important; background:#000!important; }
-    video, .html5-main-video { position:fixed!important; left:0!important; top:0!important; width:100vw!important; height:100vh!important; min-width:100vw!important; min-height:100vh!important; object-fit:cover!important; background:#000!important; transform:none!important; }
+    video, .html5-main-video { position:fixed!important; inset:0!important; margin:auto!important; width:100vw!important; height:100vh!important; max-width:100vw!important; max-height:100vh!important; object-fit:contain!important; background:#000!important; transform:none!important; }
     .ytp-chrome-bottom, .ytp-gradient-bottom, .ytp-pause-overlay, .ytp-ce-element { opacity:0!important; pointer-events:none!important; }
   `
   let style = document.getElementById('hermes-youtube-float-style')
@@ -63,7 +63,7 @@ const focusPlayerScript = '(' + function () {
   const video = document.querySelector('video')
   if (video) {
     video.controls = false
-    video.style.cssText = 'position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;min-width:100vw!important;min-height:100vh!important;object-fit:cover!important;background:#000!important;transform:none!important;'
+    video.style.cssText = 'position:fixed!important;inset:0!important;margin:auto!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;background:#000!important;transform:none!important;'
     video.play().catch(() => undefined)
     window.dispatchEvent(new Event('resize'))
   }
@@ -137,7 +137,18 @@ function YouTubeFloat() {
   const [progress, setProgress] = useState({ current: 0, duration: 0, paused: true })
   const searchRef = useRef(null)
   const playerRef = useRef(null)
+  const rootRef = useRef(null)
   const watchSrc = useMemo(() => playerSrc(videoId), [videoId])
+
+  useEffect(() => {
+    const cfg = PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
+    const pane = rootRef.current?.closest?.('[data-floating-pane]')
+    if (!pane) return
+    // ponytail: plugin SDK has no pane resize API; mutate the host floating card.
+    pane.style.width = cfg.width
+    pane.style.height = cfg.height
+    window.dispatchEvent(new Event('resize'))
+  }, [playerSize])
 
   const syncState = result => {
     if (!result) return
@@ -201,10 +212,10 @@ function YouTubeFloat() {
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   const pill = active => cn('rounded-full border px-2.5 py-1 text-xs transition', active ? 'border-(--ui-accent) bg-(--ui-accent) text-(--ui-accent-contrast)' : 'border-(--ui-border-muted) text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)')
 
-  return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', children: [
+  return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, children: [
     jsx('div', {
       className: 'shrink-0 bg-black',
-      style: { height: PLAYER_SIZES[playerSize].height },
+      style: { height: (PLAYER_SIZES[playerSize] || PLAYER_SIZES.large).player },
       children: videoId
         ? jsx('webview', { allowpopups: 'true', className: 'block h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc })
         : jsx('div', { className: 'grid h-full place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
@@ -233,4 +244,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v15', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v16', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

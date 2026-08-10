@@ -55,3 +55,7 @@
 ## v0.14
 
 - Add player size presets.
+
+## v0.15
+
+- Resize floating pane from presets.
