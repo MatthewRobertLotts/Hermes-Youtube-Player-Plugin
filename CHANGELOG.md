@@ -43,3 +43,7 @@
 ## v0.11
 
 - Restore stable v9-style layout.
+
+## v0.12
+
+- Stabilise video player sizing.

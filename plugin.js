@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v12-v9-layout-fix'
+const VERSION = 'v13-stable-layout'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -196,28 +196,33 @@ function YouTubeFloat() {
   const pill = active => cn('rounded-full border px-2.5 py-1 text-xs transition', active ? 'border-(--ui-accent) bg-(--ui-accent) text-(--ui-accent-contrast)' : 'border-(--ui-border-muted) text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)')
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', children: [
-    videoId ? jsx('webview', { allowpopups: 'true', className: 'min-h-0 flex-1 bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc }) : jsx('div', { className: 'grid min-h-0 flex-1 place-items-center bg-black px-3 text-center text-xs text-white/60', children: status === 'Searching YouTube…' ? 'Searching… pick a result below to play.' : `${VERSION}: Search, then pick a result below.` }),
+    jsx('div', {
+      className: 'shrink-0 bg-black',
+      style: { height: 'clamp(260px, 52vh, 460px)' },
+      children: videoId
+        ? jsx('webview', { allowpopups: 'true', className: 'block h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc })
+        : jsx('div', { className: 'grid h-full place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
+    }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
-    videoId ? jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
-      jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runPlayer('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
+    jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
+      jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runPlayer('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-1.5', children: [
-        jsx('button', { className: pill(false), onClick: () => playOffset(-1), type: 'button', children: '⏮' }),
-        jsx('button', { className: pill(!progress.paused), onClick: () => runPlayer('playPause'), type: 'button', children: progress.paused ? '▶ Play' : '⏸ Pause' }),
-        jsx('button', { className: pill(false), onClick: () => playOffset(1), type: 'button', children: '⏭' }),
-        jsx('button', { className: pill(loop), onClick: () => { const next = !loop; setLoop(next); void runPlayer('loop', next) }, type: 'button', children: loop ? 'Loop ✓' : 'Loop' }),
-        jsx('button', { className: pill(false), onClick: () => runPlayer('rewind'), type: 'button', children: '-10s' }),
-        jsx('button', { className: pill(false), onClick: () => runPlayer('forward'), type: 'button', children: '+10s' }),
-        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => { setQuality(e.currentTarget.value); void runPlayer('quality', e.currentTarget.value) }, value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) }),
-        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => { setCaption(e.currentTarget.value); void runPlayer('caption', e.currentTarget.value === 'off' ? '' : e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.id, children: c.label }, c.id))] })
+        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(-1), type: 'button', children: '⏮' }),
+        jsx('button', { className: pill(Boolean(videoId) && !progress.paused), disabled: !videoId, onClick: () => runPlayer('playPause'), type: 'button', children: progress.paused ? '▶ Play' : '⏸ Pause' }),
+        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(1), type: 'button', children: '⏭' }),
+        jsx('button', { className: pill(loop), disabled: !videoId, onClick: () => { const next = !loop; setLoop(next); void runPlayer('loop', next) }, type: 'button', children: loop ? 'Loop ✓' : 'Loop' }),
+        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runPlayer('rewind'), type: 'button', children: '-10s' }),
+        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runPlayer('forward'), type: 'button', children: '+10s' }),
+        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setQuality(e.currentTarget.value); void runPlayer('quality', e.currentTarget.value) }, value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) }),
+        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setCaption(e.currentTarget.value); void runPlayer('caption', e.currentTarget.value === 'off' ? '' : e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.id, children: c.label }, c.id))] })
       ] })
-    ] }) : null,
+    ] }),
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => setFilter(e.currentTarget.value), value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
-      jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: 'Search' })
+      jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' })
     ] }),
-    results.length ? jsx('div', { className: videoId ? 'max-h-36 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1' : 'min-h-0 flex-1 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', result.id === videoId ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, result.id === videoId ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'shrink-0 truncate border-t border-white/10 px-2 py-1 text-[11px] text-(--ui-text-quaternary)', children: `${VERSION}: ${status}` })
+    results.length ? jsx('div', { className: 'max-h-[30vh] min-h-0 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', result.id === videoId ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, result.id === videoId ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'min-h-0 flex-1 border-t border-white/10 px-2 py-2 text-[11px] text-(--ui-text-quaternary)', children: status === 'Searching YouTube…' ? 'Searching… results will appear here.' : status })
   ] })
-}
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v12', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v13', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
