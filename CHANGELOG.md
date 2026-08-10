@@ -15,3 +15,7 @@
 ## v0.4
 
 - Repair bundled plugin path handling.
+
+## v0.5
+
+- Fix plugin syntax and startup.

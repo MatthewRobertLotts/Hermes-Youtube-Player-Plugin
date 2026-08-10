@@ -1,35 +1,28 @@
 $ErrorActionPreference = 'Stop'
 $source = Join-Path $PSScriptRoot 'plugin.js'
 $targets = New-Object System.Collections.Generic.List[string]
-
 function Add-Target([string]$root) {
   if ([string]::IsNullOrWhiteSpace($root)) { return }
   $targets.Add((Join-Path $root 'desktop-plugins\youtube-float\plugin.js'))
   $profiles = Join-Path $root 'profiles'
   if (Test-Path $profiles) {
-    Get-ChildItem -Path $profiles -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-      $targets.Add((Join-Path $_.FullName 'desktop-plugins\youtube-float\plugin.js'))
-    }
+    Get-ChildItem -Path $profiles -Directory -ErrorAction SilentlyContinue | ForEach-Object { $targets.Add((Join-Path $_.FullName 'desktop-plugins\youtube-float\plugin.js')) }
   }
 }
-
 Add-Target (Join-Path $env:LOCALAPPDATA 'hermes')
 Add-Target (Join-Path $env:USERPROFILE '.hermes')
 try { Add-Target ([Environment]::GetEnvironmentVariable('HERMES_HOME', 'User')) } catch {}
 try { Add-Target ([Environment]::GetEnvironmentVariable('HERMES_HOME', 'Process')) } catch {}
-
 $written = @()
 $targets | Select-Object -Unique | ForEach-Object {
   $dir = Split-Path $_ -Parent
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v5-pathfix') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v6-syntaxfix') { throw "Copy verification failed: $_" }
+  if ($text -match "const thumb = .*``https") { throw "Bad nested template copied: $_" }
   $written += $_
 }
-
-Write-Host 'Installed YouTube Float v5-pathfix to:'
+Write-Host 'Installed YouTube Float v6-syntaxfix to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host ''
-Write-Host 'Now FULLY QUIT Hermes Desktop from the tray/taskbar and reopen it.'
-Write-Host 'If the floating pane title is not "YouTube v5", Desktop is loading a different plugin folder.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v6.'

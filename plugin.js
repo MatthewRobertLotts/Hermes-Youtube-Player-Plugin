@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v5-pathfix'
+const VERSION = 'v6-syntaxfix'
 const DEFAULT_QUERY = 'king boomer'
 
 function videoIdFrom(input) {
@@ -61,7 +61,7 @@ const scrapeSearchScript = `new Promise(resolve => {
       if (!title || /now playing/i.test(title) || /^\d+:\d+/.test(title)) continue
       seen.add(id)
       const img = row.querySelector('img')
-      const thumb = img?.src || img?.getAttribute('data-thumb') || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
+      const thumb = img?.src || img?.getAttribute('data-thumb') || 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg'
       out.push({ id, title, thumb })
       if (out.length >= 8) break
     }
@@ -202,7 +202,7 @@ export default {
     ctx.register({
       id: 'player',
       area: 'panes',
-      title: 'YouTube v5',
+      title: 'YouTube v6',
       data: { placement: 'floating', anchor: 'top-right', width: '500px', height: '420px' },
       render: () => jsx(YouTubeFloat, {})
     })
