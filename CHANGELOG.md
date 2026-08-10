@@ -27,3 +27,7 @@
 ## v0.7
 
 - Add player ui shell.
+
+## v0.8
+
+- Add playback controls.
