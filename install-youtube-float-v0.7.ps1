@@ -19,10 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v7-watchpage') { throw "Copy verification failed: $_" }
-  if ($text -match 'youtube-nocookie.com/embed') { throw "Old embed player still present: $_" }
+  if ($text -notmatch 'v8-player-ui') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v7-watchpage to:'
+Write-Host 'Installed YouTube Float v8-player-ui to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v7.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v8.'

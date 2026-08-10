@@ -23,3 +23,7 @@
 ## v0.6
 
 - Switch player to youtube watch page.
+
+## v0.7
+
+- Add player ui shell.
