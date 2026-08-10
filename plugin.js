@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v11-search-first'
+const VERSION = 'v12-v9-layout-fix'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -45,7 +45,7 @@ const focusPlayerScript = '(' + function () {
     ytd-masthead, #masthead-container, #secondary, #comments, #meta, #info, #below, #chat, ytd-merch-shelf-renderer, ytd-engagement-panel-section-list-renderer, .ytp-chrome-top { display:none!important; }
     ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner { margin:0!important; padding:0!important; width:100vw!important; max-width:none!important; }
     #player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container { position:fixed!important; left:0!important; top:0!important; right:0!important; bottom:0!important; width:100vw!important; height:100vh!important; max-height:none!important; min-width:0!important; transform:none!important; z-index:2147483647!important; background:#000!important; }
-    video { position:fixed!important; left:0!important; top:0!important; width:100vw!important; height:100vh!important; object-fit:contain!important; background:#000!important; transform:none!important; }
+    video, .html5-main-video { position:fixed!important; left:0!important; top:0!important; width:100vw!important; height:100vh!important; min-width:100vw!important; min-height:100vh!important; object-fit:contain!important; background:#000!important; transform:none!important; }
     .ytp-chrome-bottom, .ytp-gradient-bottom, .ytp-pause-overlay, .ytp-ce-element { opacity:0!important; pointer-events:none!important; }
   `
   let style = document.getElementById('hermes-youtube-float-style')
@@ -58,7 +58,9 @@ const focusPlayerScript = '(' + function () {
   const video = document.querySelector('video')
   if (video) {
     video.controls = false
+    video.style.cssText = 'position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;min-width:100vw!important;min-height:100vh!important;object-fit:contain!important;background:#000!important;transform:none!important;'
     video.play().catch(() => undefined)
+    window.dispatchEvent(new Event('resize'))
   }
   const player = document.getElementById('movie_player')
   const levels = player?.getAvailableQualityLevels?.() || []
@@ -194,9 +196,9 @@ function YouTubeFloat() {
   const pill = active => cn('rounded-full border px-2.5 py-1 text-xs transition', active ? 'border-(--ui-accent) bg-(--ui-accent) text-(--ui-accent-contrast)' : 'border-(--ui-border-muted) text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)')
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', children: [
-    jsx('div', { className: 'shrink-0 bg-black', style: { height: videoId ? 'min(52vh, 58vw)' : 96, minHeight: videoId ? 220 : 96 }, children: videoId ? jsx('webview', { allowpopups: 'true', className: 'block h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc }) : jsx('div', { className: 'grid h-full place-items-center bg-black px-3 text-center text-xs text-white/60', children: status === 'Searching YouTube…' ? 'Searching… results will appear below. Pick one to play.' : `${VERSION}: ${status}` }) }),
+    videoId ? jsx('webview', { allowpopups: 'true', className: 'min-h-0 flex-1 bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc }) : jsx('div', { className: 'grid min-h-0 flex-1 place-items-center bg-black px-3 text-center text-xs text-white/60', children: status === 'Searching YouTube…' ? 'Searching… pick a result below to play.' : `${VERSION}: Search, then pick a result below.` }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
-    jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
+    videoId ? jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runPlayer('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-1.5', children: [
         jsx('button', { className: pill(false), onClick: () => playOffset(-1), type: 'button', children: '⏮' }),
@@ -208,14 +210,14 @@ function YouTubeFloat() {
         jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => { setQuality(e.currentTarget.value); void runPlayer('quality', e.currentTarget.value) }, value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) }),
         jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => { setCaption(e.currentTarget.value); void runPlayer('caption', e.currentTarget.value === 'off' ? '' : e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.id, children: c.label }, c.id))] })
       ] })
-    ] }),
+    ] }) : null,
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => setFilter(e.currentTarget.value), value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
       jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: 'Search' })
     ] }),
-    results.length ? jsx('div', { className: 'min-h-0 flex-1 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', result.id === videoId ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, result.id === videoId ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'shrink-0 truncate border-t border-white/10 px-2 py-1 text-[11px] text-(--ui-text-quaternary)', children: `${VERSION}: ${status}` })
+    results.length ? jsx('div', { className: videoId ? 'max-h-36 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1' : 'min-h-0 flex-1 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', result.id === videoId ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, result.id === videoId ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'shrink-0 truncate border-t border-white/10 px-2 py-1 text-[11px] text-(--ui-text-quaternary)', children: `${VERSION}: ${status}` })
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v11', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v12', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }

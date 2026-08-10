@@ -39,3 +39,7 @@
 ## v0.10
 
 - Show first search result cleanly.
+
+## v0.11
+
+- Restore stable v9-style layout.
