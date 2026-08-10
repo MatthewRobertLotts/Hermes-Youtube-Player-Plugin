@@ -27,8 +27,19 @@ function videoIdFrom(input) {
 }
 
 function playerSrc(videoId) {
-  // ponytail: Electron embeds hit YouTube Error 153 without a blessed referer; the watch page plays.
-  return videoId ? `https://www.youtube.com/watch?v=${videoId}&autoplay=1` : 'about:blank'
+  if (!videoId) return 'about:blank'
+  const params = new URLSearchParams({
+    autoplay: '1',
+    enablejsapi: '1',
+    modestbranding: '1',
+    origin: 'https://www.youtube.com',
+    playsinline: '1',
+    rel: '0',
+    widget_referrer: 'https://www.youtube.com/'
+  })
+
+  // ponytail: Hermes Electron stamps Referer only on persist:hermes-embed; pair with youtube-nocookie.
+  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`
 }
 
 function searchSrc(query) {
@@ -40,12 +51,13 @@ const scrapeSearchScript = `new Promise(resolve => {
     const seen = new Set()
     const out = []
     for (const row of document.querySelectorAll('ytd-video-renderer, ytd-rich-item-renderer')) {
-      const link = row.querySelector('a#video-title, a[href*=\"/watch?v=\"]')
+      const link = row.querySelector('a#video-title') || row.querySelector('a[href*=\"/watch?v=\"]')
       if (!link) continue
       const id = new URL(link.href, location.href).searchParams.get('v')
       if (!id || seen.has(id)) continue
-      const title = (link.getAttribute('title') || link.getAttribute('aria-label') || link.textContent || '').replace(/\\s+/g, ' ').trim()
-      if (!title || /now playing/i.test(title)) continue
+      const titleNode = row.querySelector('#video-title') || link
+      const title = (titleNode.getAttribute('title') || titleNode.textContent || '').replace(/\\s+/g, ' ').trim()
+      if (!title || /now playing/i.test(title) || /^\d+:\d+/.test(title)) continue
       seen.add(id)
       const img = row.querySelector('img')
       const thumb = img?.src || img?.getAttribute('data-thumb') || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
@@ -117,7 +129,9 @@ function YouTubeFloat() {
       videoId
         ? jsx('webview', {
             className: 'min-h-0 flex-1 bg-black',
-            partition: 'persist:hermes-youtube-float-player',
+            allowfullscreen: 'true',
+            partition: 'persist:hermes-embed',
+            referrerpolicy: 'strict-origin-when-cross-origin',
             src: watchSrc
           })
         : jsx('div', { className: 'grid min-h-0 flex-1 place-items-center bg-black text-xs text-white/60', children: status }),
