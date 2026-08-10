@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v6-syntaxfix'
+const VERSION = 'v7-watchpage'
 const DEFAULT_QUERY = 'king boomer'
 
 function videoIdFrom(input) {
@@ -28,19 +28,8 @@ function videoIdFrom(input) {
 }
 
 function playerSrc(videoId) {
-  if (!videoId) return 'about:blank'
-  const params = new URLSearchParams({
-    autoplay: '1',
-    enablejsapi: '1',
-    modestbranding: '1',
-    origin: 'https://www.youtube.com',
-    playsinline: '1',
-    rel: '0',
-    widget_referrer: 'https://www.youtube.com/'
-  })
-
-  // ponytail: Hermes Electron stamps Referer only on persist:hermes-embed; pair with youtube-nocookie.
-  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`
+  // ponytail: embeds are blocked by YouTube in Electron; full watch page is the smallest reliable player.
+  return videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' : 'about:blank'
 }
 
 function searchSrc(query) {
@@ -130,9 +119,8 @@ function YouTubeFloat() {
       videoId
         ? jsx('webview', {
             className: 'min-h-0 flex-1 bg-black',
-            allowfullscreen: 'true',
-            partition: 'persist:hermes-embed',
-            referrerpolicy: 'strict-origin-when-cross-origin',
+            allowpopups: 'true',
+            partition: 'persist:hermes-youtube-float-player',
             src: watchSrc
           })
         : jsx('div', { className: 'grid min-h-0 flex-1 place-items-center bg-black text-xs text-white/60', children: `${VERSION}: ${status}` }),
@@ -202,7 +190,7 @@ export default {
     ctx.register({
       id: 'player',
       area: 'panes',
-      title: 'YouTube v6',
+      title: 'YouTube v7',
       data: { placement: 'floating', anchor: 'top-right', width: '500px', height: '420px' },
       render: () => jsx(YouTubeFloat, {})
     })

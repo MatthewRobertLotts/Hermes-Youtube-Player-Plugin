@@ -19,10 +19,10 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v6-syntaxfix') { throw "Copy verification failed: $_" }
-  if ($text -match "const thumb = .*``https") { throw "Bad nested template copied: $_" }
+  if ($text -notmatch 'v7-watchpage') { throw "Copy verification failed: $_" }
+  if ($text -match 'youtube-nocookie.com/embed') { throw "Old embed player still present: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v6-syntaxfix to:'
+Write-Host 'Installed YouTube Float v7-watchpage to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v6.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v7.'

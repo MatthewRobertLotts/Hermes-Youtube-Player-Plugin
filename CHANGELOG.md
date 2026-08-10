@@ -19,3 +19,7 @@
 ## v0.5
 
 - Fix plugin syntax and startup.
+
+## v0.6
+
+- Switch player to youtube watch page.
