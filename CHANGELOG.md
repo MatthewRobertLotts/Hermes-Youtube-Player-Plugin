@@ -59,3 +59,7 @@
 ## v0.15
 
 - Resize floating pane from presets.
+
+## v0.16
+
+- Improve video fill behaviour.

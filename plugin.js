@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v16-window-presets'
+const VERSION = 'v17-video-fill'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -48,9 +48,9 @@ const focusPlayerScript = '(' + function () {
   const css = `
     html, body, ytd-app, #content, #page-manager, ytd-watch-flexy { background:#000!important; margin:0!important; padding:0!important; overflow:hidden!important; min-width:0!important; }
     ytd-masthead, #masthead-container, #secondary, #comments, #meta, #info, #below, #chat, ytd-merch-shelf-renderer, ytd-engagement-panel-section-list-renderer, .ytp-chrome-top { display:none!important; }
-    ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner { margin:0!important; padding:0!important; width:100vw!important; max-width:none!important; }
-    #player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container { position:fixed!important; left:0!important; top:0!important; right:0!important; bottom:0!important; width:100vw!important; height:100vh!important; max-height:none!important; min-width:0!important; transform:none!important; z-index:2147483647!important; background:#000!important; }
-    video, .html5-main-video { position:fixed!important; inset:0!important; margin:auto!important; width:100vw!important; height:100vh!important; max-width:100vw!important; max-height:100vh!important; object-fit:contain!important; background:#000!important; transform:none!important; }
+    ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner { margin:0!important; padding:0!important; width:100vw!important; height:100vh!important; max-width:none!important; }
+    #player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container { position:fixed!important; inset:0!important; width:100vw!important; height:100vh!important; max-width:100vw!important; max-height:100vh!important; min-width:100vw!important; min-height:100vh!important; transform:none!important; z-index:2147483647!important; background:#000!important; overflow:hidden!important; }
+    video, .html5-main-video { position:absolute!important; inset:0!important; margin:auto!important; width:100%!important; height:100%!important; max-width:100%!important; max-height:100%!important; min-width:0!important; min-height:0!important; object-fit:contain!important; background:#000!important; transform:none!important; }
     .ytp-chrome-bottom, .ytp-gradient-bottom, .ytp-pause-overlay, .ytp-ce-element { opacity:0!important; pointer-events:none!important; }
   `
   let style = document.getElementById('hermes-youtube-float-style')
@@ -60,12 +60,28 @@ const focusPlayerScript = '(' + function () {
     document.documentElement.appendChild(style)
   }
   style.textContent = css
-  const video = document.querySelector('video')
-  if (video) {
-    video.controls = false
-    video.style.cssText = 'position:fixed!important;inset:0!important;margin:auto!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;background:#000!important;transform:none!important;'
-    video.play().catch(() => undefined)
-    window.dispatchEvent(new Event('resize'))
+  const apply = () => {
+    const vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1)
+    const vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1)
+    const player = document.getElementById('movie_player')
+    for (const el of document.querySelectorAll('#player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container')) {
+      el.style.cssText = `position:fixed!important;inset:0!important;width:${vw}px!important;height:${vh}px!important;max-width:${vw}px!important;max-height:${vh}px!important;min-width:${vw}px!important;min-height:${vh}px!important;transform:none!important;background:#000!important;overflow:hidden!important;`
+    }
+    const video = document.querySelector('video')
+    if (video) {
+      video.controls = false
+      video.style.cssText = 'position:absolute!important;inset:0!important;margin:auto!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;min-width:0!important;min-height:0!important;object-fit:contain!important;background:#000!important;transform:none!important;'
+      video.play().catch(() => undefined)
+    }
+    try { player?.setSize?.(vw, vh) } catch {}
+    return video
+  }
+  const video = apply()
+  if (!window.__hermesYoutubeFloatFill) {
+    window.__hermesYoutubeFloatFill = true
+    new MutationObserver(apply).observe(document.documentElement, { attributes: true, childList: true, subtree: true })
+    window.addEventListener('resize', apply)
+    setInterval(apply, 1000)
   }
   const player = document.getElementById('movie_player')
   const levels = player?.getAvailableQualityLevels?.() || []
@@ -244,4 +260,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v16', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v17', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
