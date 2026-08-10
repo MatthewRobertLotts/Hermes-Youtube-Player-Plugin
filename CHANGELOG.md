@@ -47,3 +47,7 @@
 ## v0.12
 
 - Stabilise video player sizing.
+
+## v0.13
+
+- Fix module export syntax.
