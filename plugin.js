@@ -26,8 +26,9 @@ function videoIdFrom(input) {
   return null
 }
 
-function embedSrc(videoId) {
-  return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&autoplay=1` : 'about:blank'
+function playerSrc(videoId) {
+  // ponytail: Electron embeds hit YouTube Error 153 without a blessed referer; the watch page plays.
+  return videoId ? `https://www.youtube.com/watch?v=${videoId}&autoplay=1` : 'about:blank'
 }
 
 function searchSrc(query) {
@@ -38,18 +39,21 @@ const scrapeSearchScript = `new Promise(resolve => {
   setTimeout(() => {
     const seen = new Set()
     const out = []
-    for (const a of document.querySelectorAll('a#video-title, ytd-video-renderer a#thumbnail, a[href*="/watch?v="]')) {
-      const href = a.href || ''
-      const id = new URL(href, location.href).searchParams.get('v')
+    for (const row of document.querySelectorAll('ytd-video-renderer, ytd-rich-item-renderer')) {
+      const link = row.querySelector('a#video-title, a[href*=\"/watch?v=\"]')
+      if (!link) continue
+      const id = new URL(link.href, location.href).searchParams.get('v')
       if (!id || seen.has(id)) continue
+      const title = (link.getAttribute('title') || link.getAttribute('aria-label') || link.textContent || '').replace(/\\s+/g, ' ').trim()
+      if (!title || /now playing/i.test(title)) continue
       seen.add(id)
-      const title = (a.textContent || a.getAttribute('title') || id).replace(/\\s+/g, ' ').trim()
-      if (!title || title === id) continue
-      out.push({ id, title })
+      const img = row.querySelector('img')
+      const thumb = img?.src || img?.getAttribute('data-thumb') || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
+      out.push({ id, title, thumb })
       if (out.length >= 8) break
     }
     resolve(out)
-  }, 1200)
+  }, 1500)
 })`
 
 function YouTubeFloat() {
@@ -59,7 +63,7 @@ function YouTubeFloat() {
   const [status, setStatus] = useState('Search for a video')
   const [searchUrl, setSearchUrl] = useState(null)
   const searchRef = useRef(null)
-  const playerSrc = useMemo(() => embedSrc(videoId), [videoId])
+  const watchSrc = useMemo(() => playerSrc(videoId), [videoId])
 
   const play = result => {
     setVideoId(result.id)
@@ -114,7 +118,7 @@ function YouTubeFloat() {
         ? jsx('webview', {
             className: 'min-h-0 flex-1 bg-black',
             partition: 'persist:hermes-youtube-float-player',
-            src: playerSrc
+            src: watchSrc
           })
         : jsx('div', { className: 'grid min-h-0 flex-1 place-items-center bg-black text-xs text-white/60', children: status }),
       searchUrl
@@ -150,17 +154,21 @@ function YouTubeFloat() {
         ? jsx('div', {
             className: 'max-h-24 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1',
             children: results.map(result =>
-              jsx(
+              jsxs(
                 'button',
                 {
                   className: cn(
-                    'block w-full truncate rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)',
+                    'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)',
                     result.id === videoId ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'
                   ),
                   onClick: () => play(result),
                   title: result.title,
                   type: 'button',
-                  children: result.title
+                  children: [
+                    jsx('img', { alt: '', className: 'h-9 w-16 shrink-0 rounded object-cover bg-black', src: result.thumb || `https://i.ytimg.com/vi/${result.id}/mqdefault.jpg` }),
+                    jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }),
+                    result.id === videoId ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null
+                  ]
                 },
                 result.id
               )
