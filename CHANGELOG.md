@@ -35,3 +35,7 @@
 ## v0.9
 
 - Disable search autoplay.
+
+## v0.10
+
+- Show first search result cleanly.

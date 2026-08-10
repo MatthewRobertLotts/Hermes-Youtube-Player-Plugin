@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v10-no-autoplay-search') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v11-search-first') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v10-no-autoplay-search to:'
+Write-Host 'Installed YouTube Float v11-search-first to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v10.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v11.'

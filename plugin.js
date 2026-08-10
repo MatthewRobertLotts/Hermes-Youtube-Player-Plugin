@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v10-no-autoplay-search'
+const VERSION = 'v11-search-first'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -173,8 +173,11 @@ function YouTubeFloat() {
         else setStatus('No videos found')
       } catch (error) { if (!cancelled) setStatus(error instanceof Error ? error.message : String(error)) }
     }
-    webview.addEventListener('dom-ready', done, { once: true })
-    return () => { cancelled = true; webview.removeEventListener('dom-ready', done) }
+    const finish = () => void done()
+    webview.addEventListener('dom-ready', finish, { once: true })
+    webview.addEventListener('did-finish-load', finish, { once: true })
+    const fallback = window.setTimeout(finish, 3500)
+    return () => { cancelled = true; window.clearTimeout(fallback); webview.removeEventListener('dom-ready', finish); webview.removeEventListener('did-finish-load', finish) }
   }, [searchUrl])
 
   const submit = event => {
@@ -184,13 +187,14 @@ function YouTubeFloat() {
     const exact = videoIdFrom(next)
     if (exact) { setResults([]); play({ id: exact, title: next }, -1); return }
     setStatus('Searching YouTube…')
-    setSearchUrl(searchSrc(next, filter))
+    setResults([])
+    setSearchUrl(searchSrc(next, filter) + '&_=' + Date.now())
   }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   const pill = active => cn('rounded-full border px-2.5 py-1 text-xs transition', active ? 'border-(--ui-accent) bg-(--ui-accent) text-(--ui-accent-contrast)' : 'border-(--ui-border-muted) text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)')
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', children: [
-    jsx('div', { className: 'shrink-0 bg-black', style: { height: 'min(52vh, 58vw)', minHeight: 220 }, children: videoId ? jsx('webview', { allowpopups: 'true', className: 'block h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc }) : jsx('div', { className: 'grid h-full place-items-center bg-black text-xs text-white/60', children: `${VERSION}: ${status}` }) }),
+    jsx('div', { className: 'shrink-0 bg-black', style: { height: videoId ? 'min(52vh, 58vw)' : 96, minHeight: videoId ? 220 : 96 }, children: videoId ? jsx('webview', { allowpopups: 'true', className: 'block h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc }) : jsx('div', { className: 'grid h-full place-items-center bg-black px-3 text-center text-xs text-white/60', children: status === 'Searching YouTube…' ? 'Searching… results will appear below. Pick one to play.' : `${VERSION}: ${status}` }) }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runPlayer('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
@@ -214,4 +218,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v10', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v11', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
