@@ -51,3 +51,7 @@
 ## v0.13
 
 - Fix module export syntax.
+
+## v0.14
+
+- Add player size presets.

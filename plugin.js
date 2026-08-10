@@ -2,13 +2,18 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v14-syntaxfix'
+const VERSION = 'v15-size-presets'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
   ['playlists', 'Playlists']
 ]
+const PLAYER_SIZES = {
+  small: { label: 'Small', height: 'clamp(220px, 34vh, 300px)' },
+  medium: { label: 'Medium', height: 'clamp(300px, 44vh, 390px)' },
+  large: { label: 'Large', height: 'clamp(390px, 56vh, 520px)' }
+}
 const QUALITY_LABELS = { auto: 'Auto', tiny: '144p', small: '240p', medium: '360p', large: '480p', hd720: '720p', hd1080: '1080p', hd1440: '1440p', hd2160: '4K' }
 const fmt = seconds => {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0:00'
@@ -45,7 +50,7 @@ const focusPlayerScript = '(' + function () {
     ytd-masthead, #masthead-container, #secondary, #comments, #meta, #info, #below, #chat, ytd-merch-shelf-renderer, ytd-engagement-panel-section-list-renderer, .ytp-chrome-top { display:none!important; }
     ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner { margin:0!important; padding:0!important; width:100vw!important; max-width:none!important; }
     #player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container { position:fixed!important; left:0!important; top:0!important; right:0!important; bottom:0!important; width:100vw!important; height:100vh!important; max-height:none!important; min-width:0!important; transform:none!important; z-index:2147483647!important; background:#000!important; }
-    video, .html5-main-video { position:fixed!important; left:0!important; top:0!important; width:100vw!important; height:100vh!important; min-width:100vw!important; min-height:100vh!important; object-fit:contain!important; background:#000!important; transform:none!important; }
+    video, .html5-main-video { position:fixed!important; left:0!important; top:0!important; width:100vw!important; height:100vh!important; min-width:100vw!important; min-height:100vh!important; object-fit:cover!important; background:#000!important; transform:none!important; }
     .ytp-chrome-bottom, .ytp-gradient-bottom, .ytp-pause-overlay, .ytp-ce-element { opacity:0!important; pointer-events:none!important; }
   `
   let style = document.getElementById('hermes-youtube-float-style')
@@ -58,7 +63,7 @@ const focusPlayerScript = '(' + function () {
   const video = document.querySelector('video')
   if (video) {
     video.controls = false
-    video.style.cssText = 'position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;min-width:100vw!important;min-height:100vh!important;object-fit:contain!important;background:#000!important;transform:none!important;'
+    video.style.cssText = 'position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;min-width:100vw!important;min-height:100vh!important;object-fit:cover!important;background:#000!important;transform:none!important;'
     video.play().catch(() => undefined)
     window.dispatchEvent(new Event('resize'))
   }
@@ -118,6 +123,7 @@ function commandScript(action, value) {
 function YouTubeFloat() {
   const [draft, setDraft] = useState(DEFAULT_QUERY)
   const [filter, setFilter] = useState('videos')
+  const [playerSize, setPlayerSize] = useState('large')
   const [videoId, setVideoId] = useState(null)
   const [results, setResults] = useState([])
   const [currentIndex, setCurrentIndex] = useState(-1)
@@ -198,7 +204,7 @@ function YouTubeFloat() {
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', children: [
     jsx('div', {
       className: 'shrink-0 bg-black',
-      style: { height: 'clamp(260px, 52vh, 460px)' },
+      style: { height: PLAYER_SIZES[playerSize].height },
       children: videoId
         ? jsx('webview', { allowpopups: 'true', className: 'block h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchSrc })
         : jsx('div', { className: 'grid h-full place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
@@ -213,6 +219,7 @@ function YouTubeFloat() {
         jsx('button', { className: pill(loop), disabled: !videoId, onClick: () => { const next = !loop; setLoop(next); void runPlayer('loop', next) }, type: 'button', children: loop ? 'Loop ✓' : 'Loop' }),
         jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runPlayer('rewind'), type: 'button', children: '-10s' }),
         jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runPlayer('forward'), type: 'button', children: '+10s' }),
+        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => setPlayerSize(e.currentTarget.value), value: playerSize, children: Object.entries(PLAYER_SIZES).map(([value, cfg]) => jsx('option', { value, children: cfg.label }, value)) }),
         jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setQuality(e.currentTarget.value); void runPlayer('quality', e.currentTarget.value) }, value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) }),
         jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setCaption(e.currentTarget.value); void runPlayer('caption', e.currentTarget.value === 'off' ? '' : e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.id, children: c.label }, c.id))] })
       ] })
@@ -226,4 +233,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v14', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v15', data: { placement: 'floating', anchor: 'top-right', width: '760px', height: '720px' }, render: () => jsx(YouTubeFloat, {}) }) } }
