@@ -11,3 +11,7 @@
 ## v0.3
 
 - Fix desktop plugin install path.
+
+## v0.4
+
+- Repair bundled plugin path handling.

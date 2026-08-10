@@ -2,6 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
+const VERSION = 'v5-pathfix'
 const DEFAULT_QUERY = 'king boomer'
 
 function videoIdFrom(input) {
@@ -134,7 +135,7 @@ function YouTubeFloat() {
             referrerpolicy: 'strict-origin-when-cross-origin',
             src: watchSrc
           })
-        : jsx('div', { className: 'grid min-h-0 flex-1 place-items-center bg-black text-xs text-white/60', children: status }),
+        : jsx('div', { className: 'grid min-h-0 flex-1 place-items-center bg-black text-xs text-white/60', children: `${VERSION}: ${status}` }),
       searchUrl
         ? jsx('webview', {
             className: 'pointer-events-none absolute h-px w-px opacity-0',
@@ -188,7 +189,7 @@ function YouTubeFloat() {
               )
             )
           })
-        : jsx('div', { className: 'shrink-0 truncate border-t border-white/10 px-2 py-1 text-[11px] text-(--ui-text-quaternary)', children: status })
+        : jsx('div', { className: 'shrink-0 truncate border-t border-white/10 px-2 py-1 text-[11px] text-(--ui-text-quaternary)', children: `${VERSION}: ${status}` })
     ]
   })
 }
@@ -201,7 +202,7 @@ export default {
     ctx.register({
       id: 'player',
       area: 'panes',
-      title: 'YouTube',
+      title: 'YouTube v5',
       data: { placement: 'floating', anchor: 'top-right', width: '500px', height: '420px' },
       render: () => jsx(YouTubeFloat, {})
     })
