@@ -31,3 +31,7 @@
 ## v0.8
 
 - Add playback controls.
+
+## v0.9
+
+- Disable search autoplay.
