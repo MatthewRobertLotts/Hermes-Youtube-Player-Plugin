@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v32-captions-dual-path'
+const VERSION = 'v33-captions-asr-kind'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -126,12 +126,15 @@ function driveScript(action, value) {
       else if (payload.action === 'caption') {
         for (const tr of (v && v.textTracks ? v.textTracks : [])) tr.mode = payload.value && (tr.language === payload.value || tr.label === payload.value) ? 'showing' : 'disabled'
         try {
-          if (payload.value === 'off') { p.setOption('captions', 'track', {}); p.setOption('captions', 'reload', true) }
+          if (typeof p.loadModule === 'function') { try { p.loadModule('captions') } catch (e) {} }
+          const tl = (p.getOption('captions', 'tracklist') || {}).tracks || []
+          if (payload.value === 'off') { p.setOption('captions', 'track', {}) }
           else {
-            const tl = (p.getOption('captions', 'tracklist') || {}).tracks || []
-            const t = tl.find(x => x.languageCode === payload.value || x.displayName === payload.value)
-            if (t) { p.setOption('captions', 'track', { languageCode: t.languageCode }); p.setOption('captions', 'reload', true) }
+            // Pass the FULL tracklist entry (languageCode + kind, e.g. 'asr' for auto-generated) - the UI does exactly this.
+            const t = tl.find(x => x.languageCode === payload.value || x.displayName === payload.value) || { languageCode: payload.value, kind: 'asr' }
+            p.setOption('captions', 'track', t)
           }
+          p.setOption('captions', 'reload', true)
         } catch (e) {}
       }
       return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: pausedOf() }
@@ -368,4 +371,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v32', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v33', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

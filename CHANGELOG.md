@@ -123,3 +123,7 @@
 ## v1.10
 
 - V32 captions dual path.
+
+## v1.11
+
+- V33 captions asr kind.
