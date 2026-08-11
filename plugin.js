@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v67-autostart-fix'
+const VERSION = 'v68-MILESTONE-autostart'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -372,6 +372,7 @@ function YouTubeFloat() {
     setStreams([])
     setStatus('Loading…')
     driftGuardRef.current = Date.now() + 2000
+    autostartRef.current = 0
   }
 
   // Player loads the watch page; we strip chrome, default captions off, and read the subtitle
@@ -441,10 +442,13 @@ function YouTubeFloat() {
   // Window after a capture during which a mismatched player videoId is expected (page reload);
   // only treat mismatches as drift once it expires.
   const driftGuardRef = useRef(0)
-  // Freshly opened playlists arrive cued but unstarted (the /playlist→watch redirect drops
-  // autoplay and the unstarted player reports paused:false); poll starts the first video.
+  // Playlist autostart: the /playlist→watch redirect silently drops autoplay, and every
+  // in-player kick (playVideo etc.) proved unreliable on the cued player. So: arm a window on a
+  // playlist click; if the first video hasn't started when the list has loaded, reload the first
+  // item via the proven /watch?v=<id>&list=<pl>&autoplay=1 path (same as clicking it).
   const autostartRef = useRef(0)
-  const autostartRunsRef = useRef(0)
+  const autostartReloadedRef = useRef(false)
+  const autostartArmedAtRef = useRef(0)
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
@@ -462,14 +466,16 @@ function YouTubeFloat() {
         // YouTube's own up-next can start a video we never asked for before our poll notices the
         // end (shorts hand over in <450ms). Heard about it via the player's current video id.
         const drift = !!expected && !!r.videoId && r.videoId !== expected && Date.now() > driftGuardRef.current
-        // Start the first video of a freshly opened playlist once it is actually cued. The
-        // unstarted player can't be trusted to report paused, so key on position + duration,
-        // and retry a few times in case playVideo lands before the player is ready.
+        // Autostart the first playlist video: nothing playing shortly after the list fills →
+        // replay item 0 via the reliable /watch?v=&autoplay=1 URL.
         if (queueModeRef.current === 'playlist' && autostartRef.current && Date.now() < autostartRef.current) {
-          if (r.current > 1) autostartRef.current = 0
-          else if (r.duration > 1 && autostartRunsRef.current < 5) {
-            autostartRunsRef.current++
-            await playerRef.current?.executeJavaScript('(function(){ const p=document.getElementById("movie_player"); if (p && typeof p.playVideo === "function") { try { p.playVideo() } catch (e) {} } })()', true).catch(() => {})
+          if (r.current > 1) { autostartRef.current = 0 }
+          else if (!autostartReloadedRef.current && resultsRef.current.length && Date.now() - autostartArmedAtRef.current > 3500) {
+            autostartRef.current = 0
+            autostartReloadedRef.current = true
+            const first = resultsRef.current[0]
+            capture(first.id, playlistStateRef.current)
+            return
           }
         }
         // Never advance while the user has the player paused: pausing takes manual control, and a
@@ -568,11 +574,14 @@ function YouTubeFloat() {
     // playlist are individual ITEMS.
     const entry = result.type === 'playlist' && (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(result.id) || !!result.list)
     const item = result.type === 'playlist' && !entry
-    autostartRef.current = entry ? Date.now() + 10000 : 0
-    autostartRunsRef.current = 0
     if (entry) { setCurrentIndex(0); setResults([]) }
     else setCurrentIndex(index)
     capture(result.id, entry ? (result.list || result.id) : (item ? playlistStateRef.current : result.list))
+    // Armed AFTER capture() — capture disarms the window, so it only lives for the playlist
+    // entry itself and any later navigation (item click, chain advance) cancels it.
+    autostartRef.current = entry ? Date.now() + 8000 : 0
+    autostartReloadedRef.current = false
+    autostartArmedAtRef.current = Date.now()
     setQueueMode(entry || item ? 'playlist' : 'search')
   }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
@@ -632,4 +641,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v67', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v68 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

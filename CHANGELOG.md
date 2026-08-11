@@ -263,3 +263,7 @@
 ## v2.17
 
 - V67 autostart fix.
+
+## v3.0 ★
+
+- Ship playlist autoplay milestone.
