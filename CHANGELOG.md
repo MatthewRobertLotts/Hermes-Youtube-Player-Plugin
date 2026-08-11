@@ -227,3 +227,7 @@
 ## v2.8
 
 - Scrape modern youtube search json.
+
+## v2.9
+
+- V59 playlist to results.
