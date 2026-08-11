@@ -259,3 +259,7 @@
 ## v2.16
 
 - V66 autostart.
+
+## v2.17
+
+- V67 autostart fix.
