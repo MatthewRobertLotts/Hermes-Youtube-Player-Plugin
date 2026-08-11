@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v21-player-surface'
+const VERSION = 'v22-yt-player-own'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -35,7 +35,7 @@ function videoIdFrom(input) {
 }
 
 function watchUrl(videoId) {
-  return videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=0' : 'about:blank'
+  return videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' : 'about:blank'
 }
 function searchSrc(query, filter) {
   const suffix = filter === 'shorts' ? ' shorts' : filter === 'playlists' ? ' playlist' : ''
@@ -68,102 +68,53 @@ const scrapeSearchScript = '(' + function () {
   })
 }.toString() + ')()'
 
-const extractStreamScript = '(' + function () {
-  try {
-    let pr = window.ytInitialPlayerResponse
-    if (!pr) {
-      const t = Array.from(document.scripts).map(s => s.textContent).find(x => x && x.indexOf('ytInitialPlayerResponse') !== -1)
-      const m = t && t.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;/s)
-      if (m) { try { pr = JSON.parse(m[1]) } catch (e) { pr = null } }
+const stripScript = '(' + function () {
+  const css = `
+    html,body,ytd-app,#content,#page-manager,ytd-watch-flexy{background:#000!important;margin:0!important;padding:0!important;overflow:hidden!important}
+    ytd-masthead,#masthead-container,tp-yt-app-header,#header,#country-code,#secondary,#comments,#related,#chat,ytd-merch-shelf-renderer,.ytp-chrome-bottom,.ytp-gradient-bottom{display:none!important}
+    ytd-watch-flexy #columns,ytd-watch-flexy #primary,ytd-watch-flexy #primary-inner{margin:0!important;padding:0!important;width:100vw!important;max-width:none!important}
+    #movie_player,.html5-video-player,.html5-video-container{width:100vw!important;height:100vh!important;max-height:100vh!important;min-width:0!important}
+    html,body,ytd-app{pointer-events:none!important;user-select:none!important}
+  `
+  let st = document.getElementById('hermes-yt-strip')
+  if (!st) { st = document.createElement('style'); st.id = 'hermes-yt-strip'; document.documentElement.appendChild(st) }
+  st.textContent = css
+  return { ok: true }
+}.toString() + ')()'
+
+function driveScript(action, value) {
+  return '(' + function (payload) {
+    const p = document.getElementById('movie_player')
+    const v = document.querySelector('video')
+    if (payload.action === 'loop' && v) v.loop = Boolean(payload.value)
+    const cmd = value => { try { return typeof value === 'function' ? value() : undefined } catch (e) { return { __err: String(e) } } }
+    if (p && typeof p.getCurrentTime === 'function') {
+      if (payload.action === 'playPause') { p.isPaused && p.isPaused() ? p.playVideo() : p.pauseVideo() }
+      else if (payload.action === 'seek') p.seekTo(Number(payload.value), true)
+      else if (payload.action === 'rewind') p.seekTo(p.getCurrentTime() - 10, true)
+      else if (payload.action === 'forward') p.seekTo(p.getCurrentTime() + 10, true)
+      else if (payload.action === 'quality' && payload.value !== 'auto') { try { p.setPlaybackQuality(payload.value) } catch (e) {} }
+      return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true) }
     }
-    if (!pr) return { ok: false, error: 'no player response' }
-    const sd = pr.streamingData || {}
-    const muxed = (sd.formats || []).filter(f => f && f.url && f.mimeType && f.mimeType.indexOf('video/mp4') !== -1)
-      .map(f => ({ url: f.url, height: f.height || 0, itag: f.itag || 0 }))
-      .sort((a, b) => b.height - a.height)
-    const caps = ((pr.captions && pr.captions.playerCaptionsTracklistRenderer && pr.captions.playerCaptionsTracklistRenderer.captionTracks) || [])
-      .map(t => ({ lang: t.languageCode || '', label: (t.name && t.name.simpleText) || t.languageCode || '', url: t.baseUrl || '' }))
-    return { ok: muxed.length > 0, muxed, captions: caps, title: (pr.videoDetails && pr.videoDetails.title) || '' }
-  } catch (e) {
-    return { ok: false, error: String(e) }
-  }
-}.toString() + ')()'
-
-// Inject our own full-viewport <video> into the webview (same session => cookies => plays).
-function injectVideoScript(url) {
-  return '(' + function (u) {
-    try {
-      const yt = document.getElementById('movie_player')
-      if (yt) yt.style.display = 'none'
-      // Kill every interactive element and YouTube chrome: this is a player surface, not a browser.
-      const inj = document.getElementById('hermes-v-style')
-      if (!inj) {
-        const s = document.createElement('style')
-        s.id = 'hermes-v-style'
-        s.textContent = 'html,body{overflow:hidden!important;background:#000!important;margin:0!important;padding:0!important}ytd-masthead,#masthead-container,tp-yt-app-header,#header,#country-code{display:none!important}html,body,#hermes-v,ytd-app{pointer-events:none!important;user-select:none!important}'
-        document.documentElement.appendChild(s)
-      }
-      let v = document.getElementById('hermes-v')
-      if (!v) {
-        v = document.createElement('video')
-        v.id = 'hermes-v'
-        v.controls = false
-        v.playsInline = true
-        v.setAttribute('playsinline', '')
-        v.style.cssText = 'position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;min-width:100vw!important;min-height:100vh!important;object-fit:contain!important;background:#000!important;margin:0!important;padding:0!important;z-index:2147483647!important;display:block!important;'
-        document.documentElement.appendChild(v)
-      }
-      v.src = u
-      v.loop = !!v.dataset.loop
-      v.muted = false
-      v.play().catch(() => undefined)
-      return { ok: true, width: window.innerWidth || 0, height: window.innerHeight || 0 }
-    } catch (e) { return { ok: false, error: String(e) } }
-  }.toString() + ')(' + JSON.stringify(url) + ')'
-}
-
-const videoStateScript = '(' + function () {
-  const v = document.getElementById('hermes-v')
-  if (!v) return { ok: false }
-  return { ok: true, current: v.currentTime, duration: v.duration || 0, paused: v.paused, loop: v.loop }
-}.toString() + ')()'
-
-function nativeCommand(action, value) {
-  return '(' + function (p) {
-    const v = document.getElementById('hermes-v')
-    if (!v) return { ok: false }
-    if (p.action === 'playPause') v.paused ? v.play() : v.pause()
-    if (p.action === 'seek') v.currentTime = Math.max(0, Math.min(v.duration || p.value, Number(p.value) || 0))
-    if (p.action === 'rewind') v.currentTime = Math.max(0, v.currentTime - 10)
-    if (p.action === 'forward') v.currentTime = Math.min(v.duration || v.currentTime + 10, v.currentTime + 10)
-    if (p.action === 'loop') v.loop = Boolean(p.value)
-    return { ok: true, current: v.currentTime, duration: v.duration || 0, paused: v.paused }
+    if (v) {
+      if (payload.action === 'playPause') v.paused ? v.play() : v.pause()
+      else if (payload.action === 'seek') v.currentTime = Math.max(0, Math.min(v.duration || payload.value, Number(payload.value) || 0))
+      else if (payload.action === 'rewind') v.currentTime = Math.max(0, v.currentTime - 10)
+      else if (payload.action === 'forward') v.currentTime = Math.min(v.duration || v.currentTime + 10, v.currentTime + 10)
+      return { ok: true, current: v.currentTime, duration: v.duration || 0, paused: v.paused }
+    }
+    return { ok: false }
   }.toString() + ')(' + JSON.stringify({ action, value }) + ')'
 }
 
-function setSrcScript(url, currentTime) {
-  return '(' + function (u, t) {
-    const v = document.getElementById('hermes-v')
-    if (!v) return false
-    v.src = u
-    if (t && t > 1) v.currentTime = t
-    v.play().catch(() => undefined)
-    return true
-  }.toString() + ')(' + JSON.stringify(url) + ',' + JSON.stringify(currentTime || 0) + ')'
-}
-
-function captionScript(capUrl, lang) {
-  return '(' + function (u, l) {
-    const v = document.getElementById('hermes-v')
-    if (!v) return
-    for (const tr of v.textTracks || []) tr.mode = 'disabled'
-    if (!u) return
-    let tr = Array.from(v.children || []).find(c => c && c.tagName === 'TRACK')
-    if (!tr) { tr = document.createElement('track'); tr.kind = 'subtitles'; tr.srclang = l || 'en'; v.appendChild(tr) }
-    tr.src = u + (u.indexOf('&') !== -1 ? '&' : '?') + 'fmt=vtt&lang=' + encodeURIComponent(l || 'en')
-    tr.mode = 'showing'
-  }.toString() + ')(' + JSON.stringify(capUrl || '') + ',' + JSON.stringify(lang || 'en') + ')'
-}
+const stateScript = '(' + function () {
+  const p = document.getElementById('movie_player')
+  const v = document.querySelector('video')
+  if (p && typeof p.getCurrentTime === 'function') {
+    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true) }
+  }
+  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true }
+}.toString() + ')()'
 
 function YouTubeFloat() {
   const [draft, setDraft] = useState(DEFAULT_QUERY)
@@ -210,64 +161,23 @@ function YouTubeFloat() {
     const webview = playerRef.current
     if (!webview || !videoId) return undefined
     const ready = async () => {
-      try {
-        const r = await webview.executeJavaScript(extractStreamScript, true)
-        if (!r || !r.ok || !Array.isArray(r.muxed) || !r.muxed.length) { setStatus('Using web player (stream unavailable)'); return }
-        setStreams(r.muxed)
-        if (Array.isArray(r.muxed)) setQualities(['auto', ...r.muxed.map(m => 'h' + m.height)])
-        if (Array.isArray(r.captions) && r.captions.length) setCaptions(r.captions)
-        setNative(true)
-        nativeRef.current = true
-        await webview.executeJavaScript(injectVideoScript(r.muxed[0].url), true)
-        if (r.title) setStatus(r.title)
-      } catch (e) { setStatus('Using web player') }
+      try { await webview.executeJavaScript(stripScript, true) } catch {}
     }
     webview.addEventListener('dom-ready', ready)
-    const fallback = window.setTimeout(() => { if (!nativeRef.current) setStatus('Using web player') }, 6000)
-    return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(fallback) }
+    return () => webview.removeEventListener('dom-ready', ready)
   }, [videoId])
 
-  // Poll progress from the injected video (or webview fallback).
+  // Poll progress from YouTube's own player.
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
-      const w = playerRef.current
-      if (!w) return
-      if (nativeRef.current) {
-        try { const r = await w.executeJavaScript(videoStateScript, true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
-      } else {
-        try { const r = await w.executeJavaScript(webviewCommand('state', null), true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
-      }
+      try { const r = await playerRef.current?.executeJavaScript(stateScript, true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
     }, 500)
     return () => window.clearInterval(timer)
-  }, [videoId, native])
+  }, [videoId])
 
   const runCommand = async (action, value) => {
-    const w = playerRef.current
-    if (!w) return
-    if (nativeRef.current) {
-      try {
-        if (action === 'quality') {
-          const m = streams.find(s => 'h' + s.height === value)
-          if (m) { const st = await w.executeJavaScript(videoStateScript, true); await w.executeJavaScript(setSrcScript(m.url, st && st.ok ? st.current : 0), true) }
-          return
-        }
-        if (action === 'caption') { const cap = captions.find(c => c.lang === value); await w.executeJavaScript(captionScript(action === 'caption' && value !== 'off' ? (cap && cap.url) : '', value && cap ? cap.lang : 'en'), true); return }
-        const r = await w.executeJavaScript(nativeCommand(action, value), true)
-        if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused })
-      } catch {}
-    } else {
-      try { const r = await w.executeJavaScript(webviewCommand(action, value), true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
-    }
-  }
-
-  // Fallback webview player driver (only used when native extraction fails).
-  function webviewCommand(action) {
-    return '(' + function () {
-      const video = document.querySelector('video')
-      if (!video) return { ok: false }
-      return { ok: true, current: video.currentTime, duration: video.duration || 0, paused: video.paused }
-    }.toString() + ')()'
+    try { const r = await playerRef.current?.executeJavaScript(driveScript(action, value), true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
   }
 
   useEffect(() => {
@@ -339,4 +249,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v21', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v22', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

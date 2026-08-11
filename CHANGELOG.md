@@ -79,3 +79,7 @@
 ## v0.20
 
 - Repair player surface layering.
+
+## v1.0
+
+- Ship watch-page player architecture.
