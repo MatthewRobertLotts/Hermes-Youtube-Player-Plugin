@@ -139,3 +139,7 @@
 ## v1.14
 
 - V36 controls layout.
+
+## v1.15
+
+- V37 compact controls.
