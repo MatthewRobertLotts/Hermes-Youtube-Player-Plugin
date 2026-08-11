@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v39-static-titles'
+const VERSION = 'v40-subs-fixed-width'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -362,9 +362,17 @@ function YouTubeFloat() {
   const play = (result, index) => { capture(result.id); setCurrentIndex(index) }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   const pill = active => cn('rounded-full border px-2.5 py-1 text-xs transition', active ? 'border-(--ui-accent) bg-(--ui-accent) text-(--ui-accent-contrast)' : 'border-(--ui-border-muted) text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)')
-  // Static-title select: the controlled value stays pinned to a disabled placeholder option that
-  // carries the label, so the button shows e.g. "Size" no matter what's chosen from the native list.
-  const sel = (label, extra) => cn('h-6 w-[68px] cursor-pointer rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs text-(--ui-text-secondary)', extra || '')
+  // Static-title select: value pinned to a disabled placeholder option carrying the label, so the
+  // button always shows e.g. "Subs". Inline width keeps it fixed regardless of option label lengths.
+  const StaticSelect = ({ children, disabled, label, onChange, title }) => jsx('select', {
+    className: 'h-6 min-w-0 cursor-pointer rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs text-(--ui-text-secondary) disabled:opacity-50',
+    style: { width: 68, maxWidth: 68 },
+    disabled,
+    onChange: e => { if (e.currentTarget.value !== '__title') onChange(e) },
+    title,
+    value: '__title',
+    children: [jsx('option', { disabled: true, value: '__title', children: label }, '__title'), ...children]
+  })
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, children: [
@@ -380,8 +388,8 @@ function YouTubeFloat() {
       jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runCommand('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
-                        jsx('select', { className: sel('Size'), onChange: e => { if (e.currentTarget.value !== '__title') setPlayerSize(e.currentTarget.value) }, title: 'Window size', value: '__title', children: [jsx('option', { disabled: true, value: '__title', children: 'Size' }, '__title'), ...Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value))] }),
-                        jsx('select', { className: sel('Quality', 'disabled:opacity-50'), disabled: !videoId, onChange: e => { if (e.currentTarget.value !== '__title') { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) } }, title: 'Video quality', value: '__title', children: [jsx('option', { disabled: true, value: '__title', children: 'Quality' }, '__title'), ...qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q))] })
+                        jsx(StaticSelect, { label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
+                        jsx(StaticSelect, { disabled: !videoId, label: 'Quality', onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, title: 'Video quality', children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) })
                       ] }),
               jsxs('div', { className: 'flex items-center gap-1.5', children: [
                 jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(-1), title: 'Previous video', type: 'button', children: '⏮' }),
@@ -391,8 +399,8 @@ function YouTubeFloat() {
                 jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(1), title: 'Next video', type: 'button', children: '⏭' })
               ] }),
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-end gap-1.5', children: [
-                        jsx('select', { className: sel('Loop'), onChange: e => { if (e.currentTarget.value !== '__title') { setLoopMode(e.currentTarget.value); void runCommand('loop', e.currentTarget.value) } }, title: 'Loop mode', value: '__title', children: [jsx('option', { disabled: true, value: '__title', children: 'Loop' }, '__title'), jsx('option', { value: 'off', children: 'Off' }, 'off'), jsx('option', { value: 'once', children: 'Once' }, 'once'), jsx('option', { value: 'inf', children: '∞' }, 'inf')] }),
-                        jsx('select', { className: sel('Subs', 'disabled:opacity-50'), disabled: !videoId, onChange: e => { if (e.currentTarget.value !== '__title') { captionRef.current = e.currentTarget.value; setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) } }, title: 'Subtitles', value: '__title', children: [jsx('option', { disabled: true, value: '__title', children: 'Subs' }, '__title'), jsx('option', { value: 'off', children: 'Off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
+                        jsx(StaticSelect, { label: 'Loop', onChange: e => { setLoopMode(e.currentTarget.value); void runCommand('loop', e.currentTarget.value) }, title: 'Loop mode', children: [jsx('option', { value: 'off', children: 'Off' }, 'off'), jsx('option', { value: 'once', children: 'Once' }, 'once'), jsx('option', { value: 'inf', children: '∞' }, 'inf')] }),
+                        jsx(StaticSelect, { disabled: !videoId, label: 'Subs', onChange: e => { captionRef.current = e.currentTarget.value; setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) }, title: 'Subtitles', children: [jsx('option', { value: 'off', children: 'Off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
                       ] })
             ] }),
     ] }),
@@ -405,4 +413,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v39', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v40', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

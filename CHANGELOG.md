@@ -151,3 +151,7 @@
 ## v1.17
 
 - V39 static titles.
+
+## v1.18
+
+- V40 subs fixed width.
