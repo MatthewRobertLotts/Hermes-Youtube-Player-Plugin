@@ -199,3 +199,7 @@
 ## v2.1
 
 - Add shorts and playlist result types.
+
+## v2.2
+
+- V52 sp filter params.

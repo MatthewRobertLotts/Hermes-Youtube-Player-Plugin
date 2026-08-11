@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v51-shorts-playlists'
+const VERSION = 'v52-sp-filter-params'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -48,9 +48,9 @@ function watchUrl(videoId, playlistId) {
   const base = videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' : 'about:blank'
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
+const SP_FILTERS = { videos: 'EgIQAQ%3D%3D', shorts: 'EgIQAUgF', playlists: 'EgIQAw%3D%3D' }
 function searchSrc(query, filter) {
-  const suffix = filter === 'shorts' ? ' shorts' : filter === 'playlists' ? ' playlist' : ''
-  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query + suffix)
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + '&sp=' + (SP_FILTERS[filter] || SP_FILTERS.videos)
 }
 
 const scrapeSearchScript = '(' + function () {
@@ -437,4 +437,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v51', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v52', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
