@@ -231,3 +231,7 @@
 ## v2.9
 
 - V59 playlist to results.
+
+## v2.10
+
+- Fix playlist results startup crash.
