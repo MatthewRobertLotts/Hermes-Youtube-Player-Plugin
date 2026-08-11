@@ -247,3 +247,7 @@
 ## v2.13
 
 - Load playlist videos from player page.
+
+## v2.14
+
+- V64 entry play.

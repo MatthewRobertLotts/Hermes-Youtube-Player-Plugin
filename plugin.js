@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v63-player-playlist'
+const VERSION = 'v64-entry-play'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -424,7 +424,14 @@ function YouTubeFloat() {
     webview.addEventListener('dom-ready', ready)
     // Captions state settles after the player initializes; enforce the chosen state late so the
     // session's remembered caption preference doesn't leak in.
-    const settle = window.setTimeout(() => { try { webview.executeJavaScript(driveScript('caption', captionRef.current), true) } catch {} }, 2500)
+    const settle = window.setTimeout(() => {
+      try { webview.executeJavaScript(driveScript('caption', captionRef.current), true) } catch {}
+      // The /playlist → /watch redirect drops autoplay=1, so the first playlist video loads
+      // paused; start it once the player's up.
+      if (queueModeRef.current === 'playlist') {
+        try { webview.executeJavaScript('(function(){ const p=document.getElementById("movie_player"); if (p && typeof p.isPaused === "function" && p.isPaused()) { try { p.playVideo() } catch (e) {} } })()', true) } catch {}
+      }
+    }, 2500)
     return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle); if (retryTimer) window.clearInterval(retryTimer); if (failTimer) window.clearTimeout(failTimer) }
   }, [videoId])
 
@@ -541,12 +548,15 @@ function YouTubeFloat() {
     setSearchUrl(searchSrc(next, filter) + '&_=' + Date.now())
   }
   const play = (result, index) => {
-    const plMode = result.type === 'playlist'
-    const plId = plMode && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(result.id)
-    if (plId || (plMode && queueModeRef.current !== 'playlist')) { setCurrentIndex(0); setResults([]) }
+    // "Playlist" rows come in two shapes: a playlist-id (PL...) as the row id, or a first-video id
+    // with a list= param. Both are playlist ENTRIES; only bare video-id rows inside an opened
+    // playlist are individual ITEMS.
+    const entry = result.type === 'playlist' && (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(result.id) || !!result.list)
+    const item = result.type === 'playlist' && !entry
+    if (entry) { setCurrentIndex(0); setResults([]) }
     else setCurrentIndex(index)
-    capture(result.id, plId ? result.id : (queueModeRef.current === 'playlist' ? playlistStateRef.current : result.list))
-    setQueueMode(plMode ? 'playlist' : 'search')
+    capture(result.id, entry ? (result.list || result.id) : (item ? playlistStateRef.current : result.list))
+    setQueueMode(entry || item ? 'playlist' : 'search')
   }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
@@ -605,4 +615,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v63', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v64', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
