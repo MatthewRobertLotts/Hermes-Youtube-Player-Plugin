@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v54-verified-sp-lockup'
+const VERSION = 'v55-shorts-chain-playlist-menu'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -252,10 +252,34 @@ function captionApplyScript(capUrl, lang) {
 const stateScript = '(' + function () {
   const p = document.getElementById('movie_player')
   const v = document.querySelector('video')
+  const ended = v ? v.ended : false
   if (p && typeof p.getCurrentTime === 'function') {
-    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true) }
+    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true), ended }
   }
-  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true }
+  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true, ended }
+}.toString() + ')()'
+
+const playlistScrapeScript = '(' + function () {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const out = []
+      const seen = new Set()
+      for (const row of document.querySelectorAll('ytd-playlist-video-renderer, ytd-playlist-panel-video-renderer')) {
+        const a = row.querySelector('a#wc-endpoint, a[href*="/watch?v="]')
+        if (!a) continue
+        const u = new URL(a.href, location.href)
+        const id = u.searchParams.get('v')
+        if (!id || seen.has(id)) continue
+        seen.add(id)
+        const title = (a.getAttribute('title') || a.textContent || '').replace(/\s+/g, ' ').trim()
+        if (!title) continue
+        const dur = (row.querySelector('.badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer span')?.textContent || '').replace(/\s+/g, ' ').trim()
+        out.push({ duration: dur, id, title })
+        if (out.length >= 60) break
+      }
+      resolve(out)
+    }, 2200)
+  })
 }.toString() + ')()'
 
 function YouTubeFloat() {
@@ -264,6 +288,8 @@ function YouTubeFloat() {
   const [playerSize, setPlayerSize] = useState('large')
   const [videoId, setVideoId] = useState(null)
   const [playlist, setPlaylist] = useState(null)
+  const [playlistUrl, setPlaylistUrl] = useState(null)
+  const [playlistItems, setPlaylistItems] = useState([])
   const [results, setResults] = useState([])
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [status, setStatus] = useState('Search for a video')
@@ -326,14 +352,32 @@ function YouTubeFloat() {
     return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle) }
   }, [videoId])
 
-  // Poll progress from YouTube's own player.
+  // Poll progress from YouTube's own player; auto-advance shorts when one ends.
+  const resultsRef = useRef(results)
+  resultsRef.current = results
+  const indexRef = useRef(currentIndex)
+  indexRef.current = currentIndex
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
       // Don't churn the DOM (and kill a native select popup) while a control has focus.
       const ae = document.activeElement
       if (ae && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT')) return
-      try { const r = await playerRef.current?.executeJavaScript(stateScript, true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
+      try {
+        const r = await playerRef.current?.executeJavaScript(stateScript, true)
+        if (!r || !r.ok) return
+        setProgress({ current: r.current, duration: r.duration, paused: r.paused })
+        if (r.ended) {
+          const list = resultsRef.current
+          const cur = list[indexRef.current]
+          // Shorts chain: a ended short hands over to the next short in the list, never YouTube's up-next.
+          if (cur && cur.type === 'short' && list[indexRef.current + 1]) {
+            const next = list[indexRef.current + 1]
+            capture(next.id, next.list)
+            setCurrentIndex(indexRef.current + 1)
+          }
+        }
+      } catch {}
     }, 500)
     return () => window.clearInterval(timer)
   }, [videoId])
@@ -375,6 +419,33 @@ function YouTubeFloat() {
     return () => { cancelled = true; window.clearTimeout(fallback); webview.removeEventListener('dom-ready', finish); webview.removeEventListener('did-finish-load', finish) }
   }, [searchUrl])
 
+  const playlistRef = useRef(null)
+
+  // Load the active playlist's video list once per playlist.
+  useEffect(() => {
+    if (!playlist) { setPlaylistItems([]); setPlaylistUrl(null); return undefined }
+    setPlaylistUrl('https://www.youtube.com/playlist?list=' + encodeURIComponent(playlist) + '&_=' + Date.now())
+    return undefined
+  }, [playlist])
+
+  useEffect(() => {
+    const webview = playlistRef.current
+    if (!webview || !playlistUrl) return undefined
+    let cancelled = false
+    const grab = async () => {
+      try {
+        const items = await webview.executeJavaScript(playlistScrapeScript, true)
+        if (cancelled) return
+        setPlaylistItems(Array.isArray(items) ? items.filter(i => i.id && i.title) : [])
+      } catch {}
+    }
+    const ev = () => void grab()
+    webview.addEventListener('dom-ready', ev, { once: true })
+    webview.addEventListener('did-finish-load', ev, { once: true })
+    const fb = window.setTimeout(ev, 4500)
+    return () => { cancelled = true; window.clearTimeout(fb); webview.removeEventListener('dom-ready', ev); webview.removeEventListener('did-finish-load', ev) }
+  }, [playlistUrl])
+
   const submit = event => {
     event.preventDefault()
     const next = draft.trim()
@@ -413,6 +484,7 @@ function YouTubeFloat() {
         : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
+    playlistUrl ? jsx('webview', { key: playlist, className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-playlist', ref: playlistRef, src: playlistUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
@@ -433,6 +505,10 @@ function YouTubeFloat() {
                       ] })
             ] }),
     ] }),
+    playlistItems.length ? jsxs('div', { className: 'max-h-[22vh] shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95', children: [
+      jsx('div', { className: 'sticky top-0 border-b border-white/10 bg-(--ui-bg-elevated) px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-(--ui-text-tertiary)', children: 'Playlist' }),
+      ...playlistItems.map(item => jsxs('button', { className: 'flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', onClick: () => capture(item.id, playlist), title: item.title, type: 'button', children: [jsx('span', { className: 'min-w-0 flex-1 truncate text-(--ui-text-secondary)', children: item.title }), item.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: item.duration }) : null] }, item.id))
+    ] }) : null,
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => setFilter(e.currentTarget.value), value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
@@ -442,4 +518,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v54', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v55', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

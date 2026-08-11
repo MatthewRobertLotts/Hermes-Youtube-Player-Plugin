@@ -211,3 +211,7 @@
 ## v2.4
 
 - Parse verified youtube result models.
+
+## v2.5
+
+- V55 shorts chain playlist menu.
