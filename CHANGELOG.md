@@ -67,3 +67,7 @@
 ## v0.17
 
 - Harden full-size video layout.
+
+## v0.18
+
+- Test native video surface approach.
