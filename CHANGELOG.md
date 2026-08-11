@@ -127,3 +127,7 @@
 ## v1.11
 
 - V33 captions asr kind.
+
+## v1.12
+
+- V34 cc click.

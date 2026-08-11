@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v33-captions-asr-kind') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v34-cc-click') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v33-captions-asr-kind to:'
+Write-Host 'Installed YouTube Float v34-cc-click to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v33.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v34.'

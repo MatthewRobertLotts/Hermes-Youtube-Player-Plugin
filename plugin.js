@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v33-captions-asr-kind'
+const VERSION = 'v34-cc-click'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -86,7 +86,7 @@ const stripScript = '(' + function () {
     const snipe = () => {
       const vid = document.querySelector('video')
       document.querySelectorAll('body *').forEach(el => {
-        if (el.classList && (el.classList.contains('ytp-caption-window') || el.classList.contains('ytp-caption-window-container'))) return
+        if (el.classList && (el.classList.contains('ytp-caption-window') || el.classList.contains('ytp-caption-window-container') || Array.from(el.classList).some(c => c.indexOf('caption') !== -1))) return
         if (!vid) { try { el.style.setProperty('visibility', 'hidden', 'important') } catch (e) {}; return }
         const inPath = el === vid || (vid.contains && vid.contains(el)) || (el.contains && el.contains(vid))
         if (inPath) return
@@ -125,14 +125,24 @@ function driveScript(action, value) {
       }
       else if (payload.action === 'caption') {
         for (const tr of (v && v.textTracks ? v.textTracks : [])) tr.mode = payload.value && (tr.language === payload.value || tr.label === payload.value) ? 'showing' : 'disabled'
+        const wantOn = payload.value !== 'off'
+        // Primary: click YouTube's own CC toggle (this is how userscripts turn captions on).
+        try {
+          const cc = p.querySelector('.ytp-subtitles-button')
+          if (cc) {
+            const on = cc.getAttribute('aria-pressed') === 'true'
+            if (wantOn && !on) cc.click()
+            else if (!wantOn && on) cc.click()
+          }
+        } catch (e) {}
+        // Secondary: drive the captions API (loadModule + full track entry + reload).
         try {
           if (typeof p.loadModule === 'function') { try { p.loadModule('captions') } catch (e) {} }
           const tl = (p.getOption('captions', 'tracklist') || {}).tracks || []
-          if (payload.value === 'off') { p.setOption('captions', 'track', {}) }
+          if (!wantOn) { p.setOption('captions', 'track', {}) }
           else {
-            // Pass the FULL tracklist entry (languageCode + kind, e.g. 'asr' for auto-generated) - the UI does exactly this.
-            const t = tl.find(x => x.languageCode === payload.value || x.displayName === payload.value) || { languageCode: payload.value, kind: 'asr' }
-            p.setOption('captions', 'track', t)
+            const t = tl.find(x => x.languageCode === payload.value || x.displayName === payload.value)
+            if (t) p.setOption('captions', 'track', t)
           }
           p.setOption('captions', 'reload', true)
         } catch (e) {}
@@ -371,4 +381,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v33', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v34', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
