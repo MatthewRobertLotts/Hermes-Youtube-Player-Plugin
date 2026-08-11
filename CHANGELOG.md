@@ -191,3 +191,7 @@
 ## v1.27
 
 - Restore compact control layout.
+
+## v2.0
+
+- Lock player controls milestone.

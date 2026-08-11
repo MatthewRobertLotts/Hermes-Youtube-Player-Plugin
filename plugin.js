@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v49-revert-layout'
+const VERSION = 'v50-text-buttons'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -408,11 +408,11 @@ function YouTubeFloat() {
                         jsx(StaticSelect, { current: quality, label: 'Quality', onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, title: 'Video quality', width: 80, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) })
                       ] }),
                             jsxs('div', { className: 'flex items-center gap-1.5', children: [
-                jsx('button', { className: ctrlBtn(), disabled: !videoId, onClick: () => playOffset(-1), title: 'Previous video', type: 'button', children: '⏮' }),
+                jsx('button', { className: ctrlBtn(), disabled: !videoId, onClick: () => playOffset(-1), title: 'Previous video', type: 'button', children: 'Prev' }),
                 jsx('button', { className: ctrlBtn(), disabled: !videoId, onClick: () => runCommand('rewind'), title: 'Rewind 10s', type: 'button', children: '-10s' }),
                 jsx('button', { className: ctrlBtn(), disabled: !videoId, onClick: () => runCommand('playPause'), title: 'Play/Pause', type: 'button', children: progress.paused ? '▶ Play' : '⏸ Pause' }),
                 jsx('button', { className: ctrlBtn(), disabled: !videoId, onClick: () => runCommand('forward'), title: 'Forward 10s', type: 'button', children: '+10s' }),
-                jsx('button', { className: ctrlBtn(), disabled: !videoId, onClick: () => playOffset(1), title: 'Next video', type: 'button', children: '⏭' })
+                jsx('button', { className: ctrlBtn(), disabled: !videoId, onClick: () => playOffset(1), title: 'Next video', type: 'button', children: 'Next' })
               ] }),
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-end gap-1.5', children: [
                         jsx(StaticSelect, { current: loopMode, label: 'Loop', onChange: e => { setLoopMode(e.currentTarget.value); void runCommand('loop', e.currentTarget.value) }, title: 'Loop mode', children: [jsx('option', { value: 'off', children: 'Off' }, 'off'), jsx('option', { value: 'once', children: 'Once' }, 'once'), jsx('option', { value: 'inf', children: '∞' }, 'inf')] }),
@@ -429,4 +429,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v49', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v50', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
