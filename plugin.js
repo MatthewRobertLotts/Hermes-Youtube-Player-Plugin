@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v55-shorts-chain-playlist-menu'
+const VERSION = 'v56-ended-flag-context-advance'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -73,7 +73,7 @@ const scrapeSearchScript = '(' + function () {
         if (!id || seen.has(id)) continue
         const tag = row.tagName || ''
         const hasV = !!url.searchParams.get('v')
-        const type = tag.indexOf('REEL') !== -1 ? 'short' : (tag.indexOf('PLAYLIST') !== -1 || !hasV) ? 'playlist' : 'video'
+        const type = url.pathname.indexOf('/shorts/') !== -1 ? 'short' : (tag.indexOf('REEL') !== -1 ? 'short' : (tag.indexOf('PLAYLIST') !== -1 || !hasV ? 'playlist' : 'video'))
         const titleNode = row.querySelector('#video-title, #video-title-link') || link
         const title = (titleNode.getAttribute('title') || titleNode.textContent || '').replace(/\s+/g, ' ').trim()
         if (!title || /now playing/i.test(title)) continue
@@ -106,6 +106,7 @@ const stripScript = '(' + function () {
     window.__hermesSniper = true
     const snipe = () => {
       const vid = document.querySelector('video')
+      if (vid && !vid.__hermesEnded) { vid.__hermesEnded = 1; vid.addEventListener('ended', () => { window.__hermesEnded = Date.now() }) }
       document.querySelectorAll('body *').forEach(el => {
         if (el.classList && (el.classList.contains('ytp-caption-window') || el.classList.contains('ytp-caption-window-container') || Array.from(el.classList).some(c => c.indexOf('caption') !== -1))) return
         if (!vid) { try { el.style.setProperty('visibility', 'hidden', 'important') } catch (e) {}; return }
@@ -252,11 +253,13 @@ function captionApplyScript(capUrl, lang) {
 const stateScript = '(' + function () {
   const p = document.getElementById('movie_player')
   const v = document.querySelector('video')
+  const flag = window.__hermesEnded || 0
+  if (flag) window.__hermesEnded = 0
   const ended = v ? v.ended : false
   if (p && typeof p.getCurrentTime === 'function') {
-    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true), ended }
+    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true), ended, endedFlag: flag }
   }
-  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true, ended }
+  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true, ended, endedFlag: flag }
 }.toString() + ')()'
 
 const playlistScrapeScript = '(' + function () {
@@ -264,8 +267,8 @@ const playlistScrapeScript = '(' + function () {
     setTimeout(() => {
       const out = []
       const seen = new Set()
-      for (const row of document.querySelectorAll('ytd-playlist-video-renderer, ytd-playlist-panel-video-renderer')) {
-        const a = row.querySelector('a#wc-endpoint, a[href*="/watch?v="]')
+      for (const row of document.querySelectorAll('ytd-playlist-video-renderer, ytd-playlist-panel-video-renderer, ytd-lockup-view-model, yt-lockup-view-model')) {
+        const a = row.querySelector('a#wc-endpoint, a#video-title-link, a[href*="/watch?v="]')
         if (!a) continue
         const u = new URL(a.href, location.href)
         const id = u.searchParams.get('v')
@@ -352,11 +355,17 @@ function YouTubeFloat() {
     return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle) }
   }, [videoId])
 
-  // Poll progress from YouTube's own player; auto-advance shorts when one ends.
+  // Poll progress from YouTube's own player; auto-advance in-context when media ends.
   const resultsRef = useRef(results)
   resultsRef.current = results
   const indexRef = useRef(currentIndex)
   indexRef.current = currentIndex
+  const videoIdRef = useRef(videoId)
+  videoIdRef.current = videoId
+  const playlistStateRef = useRef(playlist)
+  playlistStateRef.current = playlist
+  const playlistItemsRef = useRef(playlistItems)
+  playlistItemsRef.current = playlistItems
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
@@ -367,18 +376,30 @@ function YouTubeFloat() {
         const r = await playerRef.current?.executeJavaScript(stateScript, true)
         if (!r || !r.ok) return
         setProgress({ current: r.current, duration: r.duration, paused: r.paused })
-        if (r.ended) {
-          const list = resultsRef.current
-          const cur = list[indexRef.current]
-          // Shorts chain: a ended short hands over to the next short in the list, never YouTube's up-next.
-          if (cur && cur.type === 'short' && list[indexRef.current + 1]) {
-            const next = list[indexRef.current + 1]
-            capture(next.id, next.list)
-            setCurrentIndex(indexRef.current + 1)
-          }
+        if (!(r.ended || r.endedFlag)) return
+        const list = resultsRef.current
+        const cur = list[indexRef.current]
+        const pl = playlistStateRef.current
+        const items = playlistItemsRef.current
+        let next = null
+        // 1) Inside an active playlist: advance to the playlist's own next video.
+        if (pl && items.length) {
+          const idx = items.findIndex(i => i.id === videoIdRef.current)
+          if (idx !== -1 && items[idx + 1]) next = items[idx + 1]
+        }
+        // 2) Shorts chain: only ever hand over to another short in the results.
+        if (!next && cur && cur.type === 'short' && list[indexRef.current + 1] && list[indexRef.current + 1].type === 'short') {
+          next = list[indexRef.current + 1]
+        }
+        if (next) {
+          capture(next.id, pl || next.list)
+          if (next === list[indexRef.current + 1]) setCurrentIndex(indexRef.current + 1)
+        } else {
+          // Nothing valid to follow: stop playback rather than let YouTube pull in irrelevant content.
+          await playerRef.current?.executeJavaScript('const v=document.querySelector("video"); if (v) v.pause()', true).catch(() => {})
         }
       } catch {}
-    }, 500)
+    }, 450)
     return () => window.clearInterval(timer)
   }, [videoId])
 
@@ -518,4 +539,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v55', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v56', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

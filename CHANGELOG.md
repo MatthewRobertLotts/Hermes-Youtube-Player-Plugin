@@ -215,3 +215,7 @@
 ## v2.5
 
 - V55 shorts chain playlist menu.
+
+## v2.6
+
+- V56 ended flag context advance.
