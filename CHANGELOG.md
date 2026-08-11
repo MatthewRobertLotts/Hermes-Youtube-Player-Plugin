@@ -155,3 +155,7 @@
 ## v1.18
 
 - V40 subs fixed width.
+
+## v1.19
+
+- V41 dropdown stays open.
