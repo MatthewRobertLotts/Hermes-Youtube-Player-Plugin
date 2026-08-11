@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v61-playlist-typing'
+const VERSION = 'v62-playlist-retry'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -418,19 +418,23 @@ function YouTubeFloat() {
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
-      // Don't churn the DOM (and kill a native select popup) while a control has focus.
+      // While a dropdown/select popup is open, unrelated DOM churn kills it; while the user drags
+      // the timeline, re-rendering fights the drag. So skip progress re-renders during
+      // interaction — but still run end/drift detection so timeline use can't break chaining.
       const ae = document.activeElement
-      if (ae && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT')) return
+      const interacting = !!ae && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT')
       try {
         const r = await playerRef.current?.executeJavaScript(stateScript, true)
         if (!r || !r.ok) return
-        setProgress({ current: r.current, duration: r.duration, paused: r.paused })
+        if (!interacting) setProgress({ current: r.current, duration: r.duration, paused: r.paused })
         const list = resultsRef.current
         const expected = list[indexRef.current]?.id
         // YouTube's own up-next can start a video we never asked for before our poll notices the
         // end (shorts hand over in <450ms). Heard about it via the player's current video id.
         const drift = !!expected && !!r.videoId && r.videoId !== expected && Date.now() > driftGuardRef.current
-        if (!(r.ended || r.endedFlag || (r.duration > 10 && r.current >= r.duration - 0.8) || drift)) return
+        // Never advance while the user has the player paused: pausing takes manual control, and a
+        // paused drifted video must stay put (hitting pause must not yank the next short in).
+        if (r.paused || !(r.ended || r.endedFlag || (r.duration > 10 && r.current >= r.duration - 0.8) || drift)) return
         const cur = list[indexRef.current]
         const qm = queueModeRef.current
         const pl = playlistStateRef.current
@@ -513,25 +517,31 @@ function YouTubeFloat() {
     const webview = playlistRef.current
     if (!webview || !playlistUrl) return undefined
     let cancelled = false
+    let attempts = 0
     const grab = async () => {
-      try {
-        const items = await webview.executeJavaScript(playlistScrapeScript, true)
-        if (cancelled || queueModeRef.current !== 'playlist') return
-        const clean = Array.isArray(items) ? items.filter(i => i.id && i.title).map(i => ({ thumb: 'https://i.ytimg.com/vi/' + i.id + '/mqdefault.jpg', ...i, type: 'playlist' })) : []
-        if (clean.length) {
-          setResults(clean)
-          setCurrentIndex(0)
-          setStatus('Playlist loaded: ' + clean.length + ' videos — autoplaying to the end')
-        } else {
-          setStatus('Playlist: could not load its videos (0 rows) — report this')
-        }
-      } catch (e) { if (!cancelled) setStatus('Playlist: load error') }
+      if (cancelled || queueModeRef.current !== 'playlist') return
+      attempts++
+      let items = []
+      try { items = await webview.executeJavaScript(playlistScrapeScript, true) } catch (e) { }
+      if (cancelled || queueModeRef.current !== 'playlist') return
+      const clean = Array.isArray(items) ? items.filter(i => i.id && i.title).map(i => ({ thumb: 'https://i.ytimg.com/vi/' + i.id + '/mqdefault.jpg', ...i, type: 'playlist' })) : []
+      if (clean.length) {
+        setResults(clean)
+        setCurrentIndex(0)
+        setStatus('Playlist loaded: ' + clean.length + ' videos — autoplaying to the end')
+        window.clearInterval(timer)
+        return
+      }
+      if (attempts >= 15) setStatus('Playlist: could not load its videos (0 rows) — report this')
     }
     const ev = () => void grab()
+    // Cold webviews can take a while before ytInitialData is scrapable; retry until the list
+    // lands instead of trusting one-shot load events.
     webview.addEventListener('dom-ready', ev, { once: true })
     webview.addEventListener('did-finish-load', ev, { once: true })
-    const fb = window.setTimeout(ev, 4500)
-    return () => { cancelled = true; window.clearTimeout(fb); webview.removeEventListener('dom-ready', ev); webview.removeEventListener('did-finish-load', ev) }
+    const timer = window.setInterval(ev, 1200)
+    const fb = window.setTimeout(ev, 3000)
+    return () => { cancelled = true; window.clearInterval(timer); window.clearTimeout(fb); webview.removeEventListener('dom-ready', ev); webview.removeEventListener('did-finish-load', ev) }
   }, [playlistUrl])
 
   const submit = event => {
@@ -579,7 +589,7 @@ function YouTubeFloat() {
         : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
-    playlistUrl ? jsx('webview', { key: playlist, className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-playlist', ref: playlistRef, src: playlistUrl }) : null,
+    playlistUrl ? jsx('webview', { key: playlist, className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: playlistRef, src: playlistUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
@@ -610,4 +620,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v61', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v62', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

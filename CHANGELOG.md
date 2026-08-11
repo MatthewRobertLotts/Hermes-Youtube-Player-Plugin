@@ -239,3 +239,7 @@
 ## v2.11
 
 - V61 playlist typing.
+
+## v2.12
+
+- V62 playlist retry.
