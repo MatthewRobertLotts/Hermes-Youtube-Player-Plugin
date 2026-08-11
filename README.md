@@ -17,6 +17,25 @@
 
 ---
 
+## Demo
+
+The player in action — 26 seconds:
+
+<p align="center">
+  <video controls width="560" poster="https://raw.githubusercontent.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/main/assets/feature-video.png">
+    <source src="https://raw.githubusercontent.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/main/assets/demo.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+</p>
+
+<p align="center">
+  <em>No player? Here's the same clip as a GIF:</em>
+  <br>
+  <img src="assets/demo.gif" alt="Hermes YouTube Player Plugin demo" width="480">
+</p>
+
+---
+
 ## What it is
 
 A floating desktop pane that brings YouTube straight into Hermes Desktop. It runs YouTube's own real player (not a hacky custom `<video>`), keeps all the transport controls you expect, and adds smart **Videos / Shorts / Playlists** search so you can watch, queue, and binge without tabbing away from your work.
@@ -63,21 +82,6 @@ Playlists — search, open a playlist, and chain through every episode:
 
 <p align="center">
   <img src="assets/feature-playlists.png" alt="Playlist hero — The Ricky Gervais Show" width="620">
-</p>
-
----
-
-## Demo
-
-The player in action — 26 seconds, GIF and video:
-
-<p align="center">
-  <img src="assets/demo.gif" alt="Hermes YouTube Player Plugin demo" width="480">
-  <br>
-  <video controls width="560">
-    <source src="assets/demo.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
 </p>
 
 ---
