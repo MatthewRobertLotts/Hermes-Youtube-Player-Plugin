@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v35-captions-default-off'
+const VERSION = 'v36-controls-layout'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -106,7 +106,18 @@ function driveScript(action, value) {
   return '(' + function (payload) {
     const p = document.getElementById('movie_player')
     const v = document.querySelector('video')
-    if (payload.action === 'loop' && v) v.loop = Boolean(payload.value)
+    if (payload.action === 'loop') {
+      // off | once | inf
+      if (window.__hermesLoopOnce && v) { try { v.removeEventListener('ended', window.__hermesLoopOnce) } catch (e) {} }
+      if (v) v.loop = payload.value === 'inf'
+      try { if (typeof p.setLoop === 'function') p.setLoop(payload.value === 'inf') } catch (e) {}
+      if (payload.value === 'once') {
+        const h = () => { const vv = document.querySelector('video'); if (!vv) return; vv.removeEventListener('ended', h); vv.currentTime = 0; vv.play().catch(() => undefined) }
+        window.__hermesLoopOnce = h
+        const vv = document.querySelector('video')
+        if (vv) vv.addEventListener('ended', h)
+      }
+    }
     const pausedOf = () => {
       if (p && typeof p.getPlayerState === 'function') return p.getPlayerState() === 2
       if (p && typeof p.isPaused === 'function') return p.isPaused()
@@ -235,7 +246,7 @@ function YouTubeFloat() {
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [status, setStatus] = useState('Search for a video')
   const [searchUrl, setSearchUrl] = useState(null)
-  const [loop, setLoop] = useState(false)
+  const [loopMode, setLoopMode] = useState('off')
   const [quality, setQuality] = useState('auto')
   const [qualities, setQualities] = useState(['auto'])
   const [caption, setCaption] = useState('off')
@@ -364,17 +375,23 @@ function YouTubeFloat() {
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runCommand('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
-      jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-1.5', children: [
-        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(-1), type: 'button', children: '⏮' }),
-        jsx('button', { className: pill(Boolean(videoId) && !progress.paused), disabled: !videoId, onClick: () => runCommand('playPause'), type: 'button', children: progress.paused ? '▶ Play' : '⏸ Pause' }),
-        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(1), type: 'button', children: '⏭' }),
-        jsx('button', { className: pill(loop), disabled: !videoId, onClick: () => { const next = !loop; setLoop(next); void runCommand('loop', next) }, type: 'button', children: loop ? 'Loop ✓' : 'Loop' }),
-        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runCommand('rewind'), type: 'button', children: '-10s' }),
-        jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runCommand('forward'), type: 'button', children: '+10s' }),
-        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => setPlayerSize(e.currentTarget.value), value: playerSize, children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
-        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) }),
-        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { captionRef.current = e.currentTarget.value; setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
-      ] })
+      jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
+              jsxs('div', { className: 'flex items-center gap-1.5', children: [
+                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => setPlayerSize(e.currentTarget.value), value: playerSize, children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
+                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) })
+              ] }),
+              jsxs('div', { className: 'flex items-center gap-1.5', children: [
+                jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(-1), type: 'button', children: '⏮' }),
+                jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runCommand('rewind'), type: 'button', children: '-10s' }),
+                jsx('button', { className: pill(Boolean(videoId) && !progress.paused), disabled: !videoId, onClick: () => runCommand('playPause'), type: 'button', children: progress.paused ? '▶ Play' : '⏸ Pause' }),
+                jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runCommand('forward'), type: 'button', children: '+10s' }),
+                jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(1), type: 'button', children: '⏭' })
+              ] }),
+              jsxs('div', { className: 'flex items-center gap-1.5', children: [
+                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => { setLoopMode(e.currentTarget.value); void runCommand('loop', e.currentTarget.value) }, value: loopMode, children: [jsx('option', { value: 'off', children: 'Loop off' }, 'off'), jsx('option', { value: 'once', children: 'Loop once' }, 'once'), jsx('option', { value: 'inf', children: 'Loop infinite' }, 'inf')] }),
+                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { captionRef.current = e.currentTarget.value; setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
+              ] })
+            ] }),
     ] }),
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => setFilter(e.currentTarget.value), value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
@@ -385,4 +402,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v35', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v36', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

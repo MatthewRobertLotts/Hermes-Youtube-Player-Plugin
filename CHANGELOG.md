@@ -135,3 +135,7 @@
 ## v1.13
 
 - V35 captions default off.
+
+## v1.14
+
+- V36 controls layout.

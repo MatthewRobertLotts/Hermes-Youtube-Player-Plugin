@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v35-captions-default-off') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v36-controls-layout') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v35-captions-default-off to:'
+Write-Host 'Installed YouTube Float v36-controls-layout to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v35.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v36.'
