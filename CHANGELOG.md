@@ -83,3 +83,7 @@
 ## v1.0
 
 - Ship watch-page player architecture.
+
+## v1.1
+
+- V23 overlays gone.
