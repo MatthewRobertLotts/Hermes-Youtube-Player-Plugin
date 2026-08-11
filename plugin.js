@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v65-search-guard'
+const VERSION = 'v66-autostart'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -425,14 +425,7 @@ function YouTubeFloat() {
     webview.addEventListener('dom-ready', ready)
     // Captions state settles after the player initializes; enforce the chosen state late so the
     // session's remembered caption preference doesn't leak in.
-    const settle = window.setTimeout(() => {
-      try { webview.executeJavaScript(driveScript('caption', captionRef.current), true) } catch {}
-      // The /playlist → /watch redirect drops autoplay=1, so the first playlist video loads
-      // paused; start it once the player's up.
-      if (queueModeRef.current === 'playlist') {
-        try { webview.executeJavaScript('(function(){ const p=document.getElementById("movie_player"); if (p && typeof p.isPaused === "function" && p.isPaused()) { try { p.playVideo() } catch (e) {} } })()', true) } catch {}
-      }
-    }, 2500)
+    const settle = window.setTimeout(() => { try { webview.executeJavaScript(driveScript('caption', captionRef.current), true) } catch {} }, 2500)
     return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle); if (retryTimer) window.clearInterval(retryTimer); if (failTimer) window.clearTimeout(failTimer) }
   }, [videoId])
 
@@ -448,6 +441,9 @@ function YouTubeFloat() {
   // Window after a capture during which a mismatched player videoId is expected (page reload);
   // only treat mismatches as drift once it expires.
   const driftGuardRef = useRef(0)
+  // Freshly opened playlists arrive paused at 0:00 (the /playlist→watch redirect drops autoplay);
+  // armed with a deadline, the poll starts the first video the moment it's actually cued.
+  const autostartRef = useRef(0)
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
@@ -465,6 +461,12 @@ function YouTubeFloat() {
         // YouTube's own up-next can start a video we never asked for before our poll notices the
         // end (shorts hand over in <450ms). Heard about it via the player's current video id.
         const drift = !!expected && !!r.videoId && r.videoId !== expected && Date.now() > driftGuardRef.current
+        // Start the first video of a freshly opened playlist once it is actually cued.
+        if (queueModeRef.current === 'playlist' && autostartRef.current && Date.now() < autostartRef.current && r.paused && r.duration > 0 && r.current <= 1) {
+          autostartRef.current = 0
+          await playerRef.current?.executeJavaScript('(function(){ const p=document.getElementById("movie_player"); if (p && typeof p.playVideo === "function") { try { p.playVideo() } catch (e) {} } })()', true).catch(() => {})
+          return
+        }
         // Never advance while the user has the player paused: pausing takes manual control, and a
         // paused drifted video must stay put (hitting pause must not yank the next short in).
         if (r.paused || !(r.ended || r.endedFlag || (r.duration > 10 && r.current >= r.duration - 0.8) || drift)) return
@@ -561,6 +563,7 @@ function YouTubeFloat() {
     // playlist are individual ITEMS.
     const entry = result.type === 'playlist' && (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(result.id) || !!result.list)
     const item = result.type === 'playlist' && !entry
+    autostartRef.current = entry ? Date.now() + 10000 : 0
     if (entry) { setCurrentIndex(0); setResults([]) }
     else setCurrentIndex(index)
     capture(result.id, entry ? (result.list || result.id) : (item ? playlistStateRef.current : result.list))
@@ -623,4 +626,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v65', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v66', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

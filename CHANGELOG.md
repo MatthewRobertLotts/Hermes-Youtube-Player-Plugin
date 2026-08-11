@@ -255,3 +255,7 @@
 ## v2.15
 
 - Guard playlist results from stale search writes.
+
+## v2.16
+
+- V66 autostart.
