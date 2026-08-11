@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v26-pause-overlay-gone'
+const VERSION = 'v27-sniper-clean'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -71,7 +71,7 @@ const scrapeSearchScript = '(' + function () {
 const stripScript = '(' + function () {
   const css = `
     html,body,ytd-app,#content,#page-manager,ytd-watch-flexy{background:#000!important;margin:0!important;padding:0!important;overflow:hidden!important}
-    ytd-masthead,#masthead-container,tp-yt-app-header,#header,#country-code,#secondary,#comments,#related,#chat,ytd-merch-shelf-renderer,.ytp-chrome-top,.ytp-chrome-bottom,.ytp-gradient-top,.ytp-gradient-bottom,.ytp-title,.ytp-title-text,.ytp-title-channel,.ytp-watermark,.ytp-ce-element,.ytp-cards-button,.ytp-iv-player-content,.ytp-pause-overlay,.ytp-pause-overlay-container{display:none!important}
+    ytd-masthead,#masthead-container,tp-yt-app-header,#header,#country-code,#secondary,#comments,#related,#chat,ytd-merch-shelf-renderer{display:none!important}
     ytd-watch-flexy #columns,ytd-watch-flexy #primary,ytd-watch-flexy #primary-inner{margin:0!important;padding:0!important;width:100vw!important;max-width:none!important}
     #movie_player,.html5-video-player,.html5-video-container{width:100vw!important;height:100vh!important;max-height:100vh!important;min-width:0!important}
     html,body,ytd-app{pointer-events:none!important;user-select:none!important}
@@ -79,6 +79,27 @@ const stripScript = '(' + function () {
   let st = document.getElementById('hermes-yt-strip')
   if (!st) { st = document.createElement('style'); st.id = 'hermes-yt-strip'; document.documentElement.appendChild(st) }
   st.textContent = css
+  // Hide ALL in-player chrome/overlays EXCEPT the video frames, re-applied on every DOM change.
+  // (More robust than naming classes: whatever overlay YouTube injects is killed on arrival.)
+  if (!window.__hermesSniper) {
+    window.__hermesSniper = true
+    const snipe = () => {
+      const player = document.getElementById('movie_player')
+      if (!player) return
+      player.querySelectorAll('*').forEach(el => {
+        if (el.tagName === 'VIDEO' || el.tagName === 'TRACK') return
+        if (el.classList && (el.classList.contains('html5-video-container') || el.classList.contains('html5-video-player') || el.classList.contains('ytp-caption-window-container') || el.classList.contains('ytp-caption-window'))) return
+        try { el.style.setProperty('visibility', 'hidden', 'important') } catch (e) {}
+      })
+      const vc = player.querySelector('.html5-video-container')
+      if (vc) { vc.style.setProperty('visibility', 'visible', 'important'); vc.style.setProperty('position', 'absolute', 'important'); vc.style.setProperty('inset', '0', 'important'); vc.style.setProperty('width', '100%', 'important'); vc.style.setProperty('height', '100%', 'important'); vc.style.setProperty('overflow', 'hidden', 'important') }
+      const vid = player.querySelector('video')
+      if (vid) { vid.style.setProperty('visibility', 'visible', 'important'); vid.style.setProperty('width', '100%', 'important'); vid.style.setProperty('height', '100%', 'important'); vid.style.setProperty('object-fit', 'contain', 'important') }
+    }
+    snipe()
+    new MutationObserver(snipe).observe(document.documentElement, { childList: true, subtree: true })
+    setInterval(snipe, 800)
+  }
   return { ok: true }
 }.toString() + ')()'
 
@@ -276,4 +297,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v26', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v27', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

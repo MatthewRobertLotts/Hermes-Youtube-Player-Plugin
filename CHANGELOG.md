@@ -99,3 +99,7 @@
 ## v1.4
 
 - V26 pause overlay gone.
+
+## v1.5
+
+- V27 sniper clean.
