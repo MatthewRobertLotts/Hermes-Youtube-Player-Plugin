@@ -243,3 +243,7 @@
 ## v2.12
 
 - V62 playlist retry.
+
+## v2.13
+
+- Load playlist videos from player page.

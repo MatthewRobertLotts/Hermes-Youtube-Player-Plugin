@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v62-playlist-retry'
+const VERSION = 'v63-player-playlist'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -28,7 +28,7 @@ const fmt = seconds => {
 function Timeline({ current, duration, onSeek, videoId }) {
   return jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
     jsx('span', { children: fmt(current) }),
-    jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: duration || 0, min: 0, onChange: e => onSeek(Number(e.currentTarget.value)), type: 'range', value: Math.min(current, duration || current) }),
+    jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: duration || 0, min: 0, onChange: e => onSeek(Number(e.currentTarget.value)), onPointerUp: e => e.currentTarget.blur(), type: 'range', value: Math.min(current, duration || current) }),
     jsx('span', { children: fmt(duration) })
   ] })
 }
@@ -296,35 +296,32 @@ const stateScript = '(' + function () {
   return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid }
 }.toString() + ')()'
 
-const playlistScrapeScript = '(' + function () {
+const playlistFillScript = '(' + function () {
   const out = []
   const seen = new Set()
+  // Watch pages carry the list in the "Up next" playlist panel; raw /playlist pages carry it as
+  // video lockups. Use whichever page we're on — never mix in recommended-video lockups.
+  const onWatch = location.href.indexOf('/watch') !== -1
+  const push = (id, title, duration, thumb) => {
+    if (!id || seen.has(id) || !title) return
+    seen.add(id)
+    out.push({ duration, id, thumb, title })
+  }
+  const txt = x => (x && (x.simpleText || ((x.runs || [{ text: '' }]).map(r => r.text).join('')))) || ''
   const walk = o => {
-    if (out.length >= 60 || !o) return
+    if (out.length >= 120 || !o) return
     if (Array.isArray(o)) { for (const x of o) walk(x); return }
     if (typeof o !== 'object') return
-    const lv = o.lockupViewModel
-    if (lv && lv.contentId && (lv.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO' || lv.contentType === 'LOCKUP_CONTENT_TYPE_SHORT_VIDEO')) {
-      const id = lv.contentId
-      if (/^[a-zA-Z0-9_-]{11}$/.test(id) && !seen.has(id)) {
-        seen.add(id)
-        let title = ''
-        try { title = lv.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}
-        let dur = ''
-        try {
-          const ov = lv.contentImage && lv.contentImage.thumbnailViewModel && lv.contentImage.thumbnailViewModel.overlays
-          dur = (ov || []).map(x => x.thumbnailBottomOverlayViewModel && x.thumbnailBottomOverlayViewModel.badges && x.thumbnailBottomOverlayViewModel.badges[0] && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel.text || '').find(Boolean) || ''
-        } catch (e) {}
-        title = String(title).replace(/\s+/g, ' ').trim()
-        if (title) out.push({ duration: String(dur).trim(), id, title })
-      }
+    const pp = o.playlistPanelVideoRenderer
+    if (pp && pp.videoId && pp.title && onWatch) {
+      const th = pp.thumbnail && pp.thumbnail.thumbnails
+      push(pp.videoId, txt(pp.title).replace(/\s+/g, ' ').trim(), txt(pp.lengthText).trim(), th && th[th.length - 1] ? th[th.length - 1].url : '')
     }
-    const pvr = o.playlistVideoRenderer
-    if (pvr && pvr.videoId && !seen.has(pvr.videoId)) {
-      seen.add(pvr.videoId)
-      const title = ((pvr.title && (pvr.title.simpleText || (pvr.title.runs && pvr.title.runs[0] && pvr.title.runs[0].text))) || '').replace(/\s+/g, ' ').trim()
-      const dur = ((pvr.lengthText && (pvr.lengthText.simpleText || (pvr.lengthText.runs && pvr.lengthText.runs[0] && pvr.lengthText.runs[0].text))) || '').trim()
-      if (title) out.push({ duration: dur, id: pvr.videoId, title })
+    const lv = o.lockupViewModel
+    if (lv && lv.contentId && !onWatch && /^[a-zA-Z0-9_-]{11}$/.test(lv.contentId)) {
+      let title = ''
+      try { title = lv.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}
+      push(lv.contentId, String(title).replace(/\s+/g, ' ').trim(), '', '')
     }
     for (const k in o) walk(o[k])
   }
@@ -338,7 +335,6 @@ function YouTubeFloat() {
   const [playerSize, setPlayerSize] = useState('large')
   const [videoId, setVideoId] = useState(null)
   const [playlist, setPlaylist] = useState(null)
-  const [playlistUrl, setPlaylistUrl] = useState(null)
   const [queueMode, setQueueMode] = useState('search')
   const [results, setResults] = useState([])
   const [currentIndex, setCurrentIndex] = useState(-1)
@@ -377,10 +373,28 @@ function YouTubeFloat() {
     driftGuardRef.current = Date.now() + 2000
   }
 
-  // Player loads the watch page; we strip chrome, default captions off, and read the subtitle list.
+  // Player loads the watch page; we strip chrome, default captions off, and read the subtitle
+  // list. In playlist mode the playlist's video list is scraped from this SAME page — its
+  // "Up next" playlist panel carries the full list — so no separate hidden webview is needed.
   useEffect(() => {
     const webview = playerRef.current
     if (!webview || !videoId) return undefined
+    let retryTimer = null
+    let failTimer = null
+    const fillPlaylist = async () => {
+      if (queueModeRef.current !== 'playlist' || resultsRef.current.length) return true
+      let items = []
+      try { items = await webview.executeJavaScript(playlistFillScript, true) } catch (e) { }
+      if (queueModeRef.current !== 'playlist' || resultsRef.current.length) return true
+      const clean = Array.isArray(items) ? items.filter(i => i.id && i.title) : []
+      if (clean.length) {
+        setResults(clean.map(i => ({ ...i, type: 'playlist' })))
+        setCurrentIndex(0)
+        setStatus('Playlist loaded: ' + clean.length + ' videos — autoplaying to the end')
+        return true
+      }
+      return false
+    }
     const ready = async () => {
       try {
         await webview.executeJavaScript(stripScript, true)
@@ -394,13 +408,24 @@ function YouTubeFloat() {
           const c = await webview.executeJavaScript(readCaptionsScript, true)
           if (c && c.ok && Array.isArray(c.tracks) && c.tracks.length) setCaptions(c.tracks)
         } catch {}
+        if (!(await fillPlaylist())) {
+          retryTimer = window.setInterval(() => { void fillPlaylist().then(done => { if (done && retryTimer) { window.clearInterval(retryTimer); retryTimer = null } }) }, 1200)
+          failTimer = window.setTimeout(() => {
+            if (retryTimer) { window.clearInterval(retryTimer); retryTimer = null }
+            if (queueModeRef.current === 'playlist' && !resultsRef.current.length) {
+              webview.executeJavaScript('({ t: document.title })', true).then(d => {
+                setStatus('Playlist: could not load' + (d && d.t ? ' ("' + String(d.t).slice(0, 40) + '")' : '') + ' — report this text')
+              }).catch(() => setStatus('Playlist: could not load its videos (0 rows) — report this'))
+            }
+          }, 6000)
+        }
       } catch {}
     }
     webview.addEventListener('dom-ready', ready)
     // Captions state settles after the player initializes; enforce the chosen state late so the
     // session's remembered caption preference doesn't leak in.
     const settle = window.setTimeout(() => { try { webview.executeJavaScript(driveScript('caption', captionRef.current), true) } catch {} }, 2500)
-    return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle) }
+    return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle); if (retryTimer) window.clearInterval(retryTimer); if (failTimer) window.clearTimeout(failTimer) }
   }, [videoId])
 
   // Poll progress from YouTube's own player; auto-advance in-context when media ends.
@@ -504,46 +529,6 @@ function YouTubeFloat() {
     return () => { cancelled = true; window.clearTimeout(fallback); webview.removeEventListener('dom-ready', finish); webview.removeEventListener('did-finish-load', finish) }
   }, [searchUrl])
 
-  const playlistRef = useRef(null)
-
-  // Load the active playlist's video list once per playlist.
-  useEffect(() => {
-    if (!playlist) { setPlaylistUrl(null); return undefined }
-    setPlaylistUrl('https://www.youtube.com/playlist?list=' + encodeURIComponent(playlist) + '&_=' + Date.now())
-    return undefined
-  }, [playlist])
-
-  useEffect(() => {
-    const webview = playlistRef.current
-    if (!webview || !playlistUrl) return undefined
-    let cancelled = false
-    let attempts = 0
-    const grab = async () => {
-      if (cancelled || queueModeRef.current !== 'playlist') return
-      attempts++
-      let items = []
-      try { items = await webview.executeJavaScript(playlistScrapeScript, true) } catch (e) { }
-      if (cancelled || queueModeRef.current !== 'playlist') return
-      const clean = Array.isArray(items) ? items.filter(i => i.id && i.title).map(i => ({ thumb: 'https://i.ytimg.com/vi/' + i.id + '/mqdefault.jpg', ...i, type: 'playlist' })) : []
-      if (clean.length) {
-        setResults(clean)
-        setCurrentIndex(0)
-        setStatus('Playlist loaded: ' + clean.length + ' videos — autoplaying to the end')
-        window.clearInterval(timer)
-        return
-      }
-      if (attempts >= 15) setStatus('Playlist: could not load its videos (0 rows) — report this')
-    }
-    const ev = () => void grab()
-    // Cold webviews can take a while before ytInitialData is scrapable; retry until the list
-    // lands instead of trusting one-shot load events.
-    webview.addEventListener('dom-ready', ev, { once: true })
-    webview.addEventListener('did-finish-load', ev, { once: true })
-    const timer = window.setInterval(ev, 1200)
-    const fb = window.setTimeout(ev, 3000)
-    return () => { cancelled = true; window.clearInterval(timer); window.clearTimeout(fb); webview.removeEventListener('dom-ready', ev); webview.removeEventListener('did-finish-load', ev) }
-  }, [playlistUrl])
-
   const submit = event => {
     event.preventDefault()
     const next = draft.trim()
@@ -557,9 +542,10 @@ function YouTubeFloat() {
   }
   const play = (result, index) => {
     const plMode = result.type === 'playlist'
-    if (plMode && queueModeRef.current !== 'playlist') { setCurrentIndex(0); setResults([]) }
+    const plId = plMode && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(result.id)
+    if (plId || (plMode && queueModeRef.current !== 'playlist')) { setCurrentIndex(0); setResults([]) }
     else setCurrentIndex(index)
-    capture(result.id, result.list)
+    capture(result.id, plId ? result.id : (queueModeRef.current === 'playlist' ? playlistStateRef.current : result.list))
     setQueueMode(plMode ? 'playlist' : 'search')
   }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
@@ -589,7 +575,6 @@ function YouTubeFloat() {
         : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
-    playlistUrl ? jsx('webview', { key: playlist, className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: playlistRef, src: playlistUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
@@ -620,4 +605,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v62', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v63', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
