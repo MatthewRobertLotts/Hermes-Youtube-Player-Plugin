@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v24-overlays-subs-play') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v25-revert-overlay') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v24-overlays-subs-play to:'
+Write-Host 'Installed YouTube Float v25-revert-overlay to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v24.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v25.'

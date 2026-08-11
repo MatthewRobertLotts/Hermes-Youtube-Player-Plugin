@@ -91,3 +91,7 @@
 ## v1.2
 
 - V24 overlays subs play.
+
+## v1.3
+
+- V25 revert overlay.
