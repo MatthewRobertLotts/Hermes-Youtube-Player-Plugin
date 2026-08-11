@@ -75,3 +75,7 @@
 ## v0.19
 
 - Move native player experiment into webview.
+
+## v0.20
+
+- Repair player surface layering.

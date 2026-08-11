@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v20-native-in-webview'
+const VERSION = 'v21-player-surface'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -95,13 +95,22 @@ function injectVideoScript(url) {
     try {
       const yt = document.getElementById('movie_player')
       if (yt) yt.style.display = 'none'
-      document.querySelectorAll('ytd-app, #page-manager, #primary, #columns, ytd-watch-flexy, ytd-player').forEach(e => { if (e) e.style.cssText = 'background:#000!important;margin:0!important;padding:0!important;overflow:hidden!important' })
+      // Kill every interactive element and YouTube chrome: this is a player surface, not a browser.
+      const inj = document.getElementById('hermes-v-style')
+      if (!inj) {
+        const s = document.createElement('style')
+        s.id = 'hermes-v-style'
+        s.textContent = 'html,body{overflow:hidden!important;background:#000!important;margin:0!important;padding:0!important}ytd-masthead,#masthead-container,tp-yt-app-header,#header,#country-code{display:none!important}html,body,#hermes-v,ytd-app{pointer-events:none!important;user-select:none!important}'
+        document.documentElement.appendChild(s)
+      }
       let v = document.getElementById('hermes-v')
       if (!v) {
         v = document.createElement('video')
         v.id = 'hermes-v'
         v.controls = false
-        v.style.cssText = 'position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;background:#000!important;margin:0!important;padding:0!important;'
+        v.playsInline = true
+        v.setAttribute('playsinline', '')
+        v.style.cssText = 'position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;min-width:100vw!important;min-height:100vh!important;object-fit:contain!important;background:#000!important;margin:0!important;padding:0!important;z-index:2147483647!important;display:block!important;'
         document.documentElement.appendChild(v)
       }
       v.src = u
@@ -303,7 +312,7 @@ function YouTubeFloat() {
       className: 'relative shrink-0 bg-black',
       style: { height: cfg().player },
       children: videoId
-        ? jsx('webview', { allowpopups: 'true', className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId) })
+        ? jsx('webview', { className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId) })
         : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
@@ -330,4 +339,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v20', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v21', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

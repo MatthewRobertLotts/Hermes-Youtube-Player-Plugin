@@ -4,7 +4,7 @@
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black)
 ![Hermes Desktop](https://img.shields.io/badge/Hermes-Desktop-6f42c1)
-![Current](https://img.shields.io/badge/Current-v0.19-22498e)
+![Current](https://img.shields.io/badge/Current-v0.20-22498e)
 ![License](https://img.shields.io/badge/License-Apache--2.0-blue)
 
 ## Overview
@@ -13,15 +13,15 @@ Hermes YouTube Player Plugin is a floating desktop pane for searching and playin
 
 Current focus:
 
-- Move native player experiment into webview.
+- Repair player surface layering.
 
 ## Install
 
 ```powershell
-Expand-Archive -Force "$env:USERPROFILE\Downloads\youtube-float-desktop-plugin-v20.zip" "$env:TEMP\youtube-float-desktop-plugin-v20"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\youtube-float-desktop-plugin-v20\install-youtube-float-v0.19.ps1"
+Expand-Archive -Force "$env:USERPROFILE\Downloads\youtube-float-desktop-plugin-v21.zip" "$env:TEMP\youtube-float-desktop-plugin-v21"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\youtube-float-desktop-plugin-v21\install-youtube-float-v0.20.ps1"
 ```
 
-After installing, fully quit and reopen Hermes Desktop. The pane title should show **YouTube v0.19**.
+After installing, fully quit and reopen Hermes Desktop. The pane title should show **YouTube v0.20**.
 
 ## Version history
 
