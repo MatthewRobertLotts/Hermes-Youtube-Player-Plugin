@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v41-dropdown-stays-open'
+const VERSION = 'v42-popup-survives'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -21,6 +21,16 @@ const fmt = seconds => {
   const m = Math.floor((seconds / 60) % 60)
   const h = Math.floor(seconds / 3600)
   return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
+}
+
+// Module-scope so it keeps a stable type: re-renders only touch THIS subtree, never the
+// dropdown controls (native select popups get killed by unrelated DOM churn in Electron).
+function Timeline({ current, duration, onSeek, videoId }) {
+  return jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
+    jsx('span', { children: fmt(current) }),
+    jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: duration || 0, min: 0, onChange: e => onSeek(Number(e.currentTarget.value)), type: 'range', value: Math.min(current, duration || current) }),
+    jsx('span', { children: fmt(duration) })
+  ] })
 }
 
 function videoIdFrom(input) {
@@ -307,6 +317,9 @@ function YouTubeFloat() {
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
+      // Don't churn the DOM (and kill a native select popup) while a control has focus.
+      const ae = document.activeElement
+      if (ae && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT')) return
       try { const r = await playerRef.current?.executeJavaScript(stateScript, true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
     }, 500)
     return () => window.clearInterval(timer)
@@ -385,7 +398,7 @@ function YouTubeFloat() {
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
-      jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runCommand('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
+      jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
                         jsx(StaticSelect, { label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
@@ -413,4 +426,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v41', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v42', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

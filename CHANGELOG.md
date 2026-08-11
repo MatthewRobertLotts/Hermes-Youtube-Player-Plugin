@@ -159,3 +159,7 @@
 ## v1.19
 
 - V41 dropdown stays open.
+
+## v1.20
+
+- V42 popup survives.
