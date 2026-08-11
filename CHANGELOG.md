@@ -63,3 +63,7 @@
 ## v0.16
 
 - Improve video fill behaviour.
+
+## v0.17
+
+- Harden full-size video layout.

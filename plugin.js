@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v17-video-fill'
+const VERSION = 'v18-video-fill-px'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -46,46 +46,51 @@ function searchSrc(query, filter) {
 
 const focusPlayerScript = '(' + function () {
   const css = `
-    html, body, ytd-app, #content, #page-manager, ytd-watch-flexy { background:#000!important; margin:0!important; padding:0!important; overflow:hidden!important; min-width:0!important; }
+    html, body, ytd-app, #content, #page-manager, ytd-watch-flexy { background:#000!important; margin:0!important; padding:0!important; overflow:hidden!important; width:100%!important; height:100%!important; }
     ytd-masthead, #masthead-container, #secondary, #comments, #meta, #info, #below, #chat, ytd-merch-shelf-renderer, ytd-engagement-panel-section-list-renderer, .ytp-chrome-top { display:none!important; }
-    ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner { margin:0!important; padding:0!important; width:100vw!important; height:100vh!important; max-width:none!important; }
-    #player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container { position:fixed!important; inset:0!important; width:100vw!important; height:100vh!important; max-width:100vw!important; max-height:100vh!important; min-width:100vw!important; min-height:100vh!important; transform:none!important; z-index:2147483647!important; background:#000!important; overflow:hidden!important; }
-    video, .html5-main-video { position:absolute!important; inset:0!important; margin:auto!important; width:100%!important; height:100%!important; max-width:100%!important; max-height:100%!important; min-width:0!important; min-height:0!important; object-fit:contain!important; background:#000!important; transform:none!important; }
-    .ytp-chrome-bottom, .ytp-gradient-bottom, .ytp-pause-overlay, .ytp-ce-element { opacity:0!important; pointer-events:none!important; }
   `
   let style = document.getElementById('hermes-youtube-float-style')
-  if (!style) {
-    style = document.createElement('style')
-    style.id = 'hermes-youtube-float-style'
-    document.documentElement.appendChild(style)
-  }
+  if (!style) { style = document.createElement('style'); style.id = 'hermes-youtube-float-style'; document.documentElement.appendChild(style) }
   style.textContent = css
-  const apply = () => {
-    const vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1)
-    const vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1)
-    const player = document.getElementById('movie_player')
-    for (const el of document.querySelectorAll('#player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container')) {
-      el.style.cssText = `position:fixed!important;inset:0!important;width:${vw}px!important;height:${vh}px!important;max-width:${vw}px!important;max-height:${vh}px!important;min-width:${vw}px!important;min-height:${vh}px!important;transform:none!important;background:#000!important;overflow:hidden!important;`
-    }
-    const video = document.querySelector('video')
+
+  // Hard pixel override: beat YouTube's own inline sizing every frame it changes.
+  function vw() { return Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1) }
+  function vh() { return Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1) }
+  function px(el) { el.style.setProperty('position', 'fixed', 'important'); el.style.setProperty('inset', '0', 'important'); el.style.setProperty('left', '0', 'important'); el.style.setProperty('top', '0', 'important'); el.style.setProperty('right', '0', 'important'); el.style.setProperty('bottom', '0', 'important'); el.style.setProperty('margin', '0', 'important'); el.style.setProperty('transform', 'none', 'important'); el.style.setProperty('z-index', '2147483647', 'important'); el.style.setProperty('width', vw() + 'px', 'important'); el.style.setProperty('height', vh() + 'px', 'important'); el.style.setProperty('min-width', vw() + 'px', 'important'); el.style.setProperty('min-height', vh() + 'px', 'important'); el.style.setProperty('max-width', vw() + 'px', 'important'); el.style.setProperty('max-height', vh() + 'px', 'important'); el.style.setProperty('background', '#000', 'important') }
+  function apply() {
+    document.querySelectorAll('#player, #player-container-outer, #player-container-inner, #player-container, #movie_player, .html5-video-player, .html5-video-container').forEach(px)
+    const video = document.querySelector('video.html5-main-video') || document.querySelector('video')
     if (video) {
       video.controls = false
-      video.style.cssText = 'position:absolute!important;inset:0!important;margin:auto!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;min-width:0!important;min-height:0!important;object-fit:contain!important;background:#000!important;transform:none!important;'
-      video.play().catch(() => undefined)
+      video.style.setProperty('object-fit', 'contain', 'important')
+      video.style.setProperty('background', '#000', 'important')
+      video.style.setProperty('position', 'fixed', 'important')
+      video.style.setProperty('left', '0', 'important')
+      video.style.setProperty('top', '0', 'important')
+      video.style.setProperty('margin', '0', 'important')
+      video.style.setProperty('transform', 'none', 'important')
+      video.style.setProperty('width', vw() + 'px', 'important')
+      video.style.setProperty('height', vh() + 'px', 'important')
+      video.style.setProperty('min-width', vw() + 'px', 'important')
+      video.style.setProperty('min-height', vh() + 'px', 'important')
+      video.style.setProperty('max-width', vw() + 'px', 'important')
+      video.style.setProperty('max-height', vh() + 'px', 'important')
+      if (video.paused) video.play().catch(() => undefined)
     }
-    try { player?.setSize?.(vw, vh) } catch {}
-    return video
+    try { document.getElementById('movie_player')?.setSize?.(vw(), vh()) } catch {}
   }
-  const video = apply()
+  // Apply now, on every resize, on structural changes, and as a safety poll.
+  apply()
+  window.addEventListener('resize', apply)
   if (!window.__hermesYoutubeFloatFill) {
     window.__hermesYoutubeFloatFill = true
     new MutationObserver(apply).observe(document.documentElement, { attributes: true, childList: true, subtree: true })
-    window.addEventListener('resize', apply)
-    setInterval(apply, 1000)
+    setInterval(apply, 800)
   }
   const player = document.getElementById('movie_player')
   const levels = player?.getAvailableQualityLevels?.() || []
-  const captions = [...(video?.textTracks || [])].map((track, i) => ({ id: track.language || String(i), label: track.label || track.language || `Track ${i + 1}` }))
+  const captions = [...(document.querySelector('video')?.textTracks || [])].map((track, i) => ({ id: track.language || String(i), label: track.label || track.language || `Track ${i + 1}` }))
+  const video = document.querySelector('video')
   return { captions, current: video?.currentTime || 0, duration: video?.duration || 0, levels, paused: video?.paused ?? true }
 }.toString() + ')()'
 
@@ -260,4 +265,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v17', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane with native-ish controls over a stripped YouTube watch page.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v18', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
