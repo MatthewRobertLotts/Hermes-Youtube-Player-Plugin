@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v30-quality-subs'
+const VERSION = 'v31-quality-captions-real'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -117,7 +117,12 @@ function driveScript(action, value) {
       else if (payload.action === 'seek') p.seekTo(Number(payload.value), true)
       else if (payload.action === 'rewind') p.seekTo(p.getCurrentTime() - 10, true)
       else if (payload.action === 'forward') p.seekTo(p.getCurrentTime() + 10, true)
-      else if (payload.action === 'quality' && payload.value !== 'auto') { try { p.setPlaybackQuality(payload.value) } catch (e) {} }
+      else if (payload.action === 'quality' && payload.value !== 'auto') {
+        try { p.setPlaybackQualityRange(payload.value, payload.value); p.setPlaybackQuality(payload.value) } catch (e) { try { p.setPlaybackQuality(payload.value) } catch (e2) {} }
+      }
+      else if (payload.action === 'quality' && payload.value === 'auto') {
+        try { p.setPlaybackQualityRange('auto'); p.setPlaybackQuality('auto') } catch (e) {}
+      }
       else if (payload.action === 'caption') {
         for (const tr of (v && v.textTracks ? v.textTracks : [])) tr.mode = payload.value && (tr.language === payload.value || tr.label === payload.value) ? 'showing' : 'disabled'
         try {
@@ -158,6 +163,43 @@ const readPlayerScript = '(' + function () {
   }
   return { levels, tracks }
 }.toString() + ')()'
+
+const readCaptionsScript = '(' + function () {
+  try {
+    let pr = window.ytInitialPlayerResponse
+    if (!pr) {
+      const t = Array.from(document.scripts).map(s => s.textContent).find(x => x && x.indexOf('ytInitialPlayerResponse') !== -1)
+      const m = t && t.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;/s)
+      if (m) { try { pr = JSON.parse(m[1]) } catch (e) {} }
+    }
+    const caps = ((pr && pr.captions && pr.captions.playerCaptionsTracklistRenderer && pr.captions.playerCaptionsTracklistRenderer.captionTracks) || [])
+      .map(t => ({ lang: t.languageCode || '', label: (t.name && t.name.simpleText) || t.languageCode || '', url: t.baseUrl || '' }))
+      .filter(c => c.label)
+    const seen = new Set()
+    const out = []
+    for (const c of caps) { if (!seen.has(c.lang)) { seen.add(c.lang); out.push(c) } }
+    return { ok: true, tracks: out }
+  } catch (e) { return { ok: false, tracks: [] } }
+}.toString() + ')()'
+
+function captionApplyScript(capUrl, lang) {
+  return '(' + function (u, l) {
+    const video = document.querySelector('video')
+    if (!video) return false
+    for (const tr of video.textTracks || []) tr.mode = 'disabled'
+    if (!u) return true
+    const vttUrl = u.indexOf('fmt=') !== -1 ? u.replace(/fmt=\w+/, 'fmt=vtt') : u + '&fmt=vtt'
+    fetch(vttUrl).then(r => r.text()).then(vtt => {
+      const blob = new Blob([vtt], { type: 'text/vtt' })
+      const url = URL.createObjectURL(blob)
+      let tr = Array.from(video.children || []).find(c => c && c.tagName === 'TRACK')
+      if (!tr) { tr = document.createElement('track'); tr.kind = 'subtitles'; tr.srclang = l || 'en'; video.appendChild(tr) }
+      tr.src = url
+      tr.mode = 'showing'
+    }).catch(() => undefined)
+    return true
+  }.toString() + ')(' + JSON.stringify(capUrl || '') + ',' + JSON.stringify(lang || 'en') + ')'
+}
 
 const stateScript = '(' + function () {
   const p = document.getElementById('movie_player')
@@ -220,6 +262,10 @@ function YouTubeFloat() {
           if (Array.isArray(r.levels) && r.levels.length) setQualities(['auto', ...r.levels])
           if (Array.isArray(r.tracks) && r.tracks.length) setCaptions(r.tracks)
         }
+        try {
+          const c = await webview.executeJavaScript(readCaptionsScript, true)
+          if (c && c.ok && Array.isArray(c.tracks) && c.tracks.length) setCaptions(c.tracks)
+        } catch {}
       } catch {}
     }
     webview.addEventListener('dom-ready', ready)
@@ -236,7 +282,15 @@ function YouTubeFloat() {
   }, [videoId])
 
   const runCommand = async (action, value) => {
-    try { const r = await playerRef.current?.executeJavaScript(driveScript(action, value), true); if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused }) } catch {}
+    try {
+      if (action === 'caption') {
+        const cap = captions.find(c => c.lang === value || c.label === value)
+        await playerRef.current?.executeJavaScript(captionApplyScript(value === 'off' ? '' : (cap && cap.url), value === 'off' ? '' : (cap && cap.lang)), true)
+        return
+      }
+      const r = await playerRef.current?.executeJavaScript(driveScript(action, value), true)
+      if (r && r.ok) setProgress({ current: r.current, duration: r.duration, paused: r.paused })
+    } catch {}
   }
 
   useEffect(() => {
@@ -308,4 +362,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v30', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v31', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

@@ -115,3 +115,7 @@
 ## v1.8
 
 - V30 quality subs.
+
+## v1.9
+
+- V31 quality captions real.
