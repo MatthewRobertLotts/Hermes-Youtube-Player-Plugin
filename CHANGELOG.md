@@ -171,3 +171,7 @@
 ## v1.22
 
 - V44 subs loop swap.
+
+## v1.23
+
+- V45 revert swap.
