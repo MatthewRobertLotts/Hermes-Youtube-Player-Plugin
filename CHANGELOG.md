@@ -187,3 +187,7 @@
 ## v1.26
 
 - Balance control bar columns.
+
+## v1.27
+
+- Restore compact control layout.
