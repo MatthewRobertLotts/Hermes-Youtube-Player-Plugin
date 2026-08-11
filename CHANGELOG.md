@@ -207,3 +207,7 @@
 ## v2.3
 
 - V53 chip click filter.
+
+## v2.4
+
+- Parse verified youtube result models.

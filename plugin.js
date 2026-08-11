@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v53-chip-click-filter'
+const VERSION = 'v54-verified-sp-lockup'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -45,28 +45,23 @@ function videoIdFrom(input) {
 }
 
 function watchUrl(videoId, playlistId) {
-  const base = videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' : 'about:blank'
+  if (!videoId) return 'about:blank'
+  if (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(videoId)) return 'https://www.youtube.com/playlist?list=' + encodeURIComponent(videoId) + '&autoplay=1'
+  const base = 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1'
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
-function searchSrc(query) {
-  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query)
+const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
+function searchSrc(query, filter) {
+  const sp = SP_FILTERS[filter]
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + (sp ? '&sp=' + sp : '')
 }
-
-const clickFilterScript = label => '(' + function (wanted) {
-  const wantedNorm = String(wanted).toLowerCase()
-  for (const node of document.querySelectorAll('ytd-search-filter-renderer')) {
-    const a = node.querySelector('a')
-    if (a && (a.textContent || '').trim().toLowerCase() === wantedNorm) { a.click(); return true }
-  }
-  return false
-}.toString() + ')(' + JSON.stringify(label) + ')'
 
 const scrapeSearchScript = '(' + function () {
   return new Promise(resolve => {
     setTimeout(() => {
       const seen = new Set()
       const out = []
-      for (const row of document.querySelectorAll('ytd-video-renderer, ytd-rich-item-renderer, ytd-reel-item-renderer, ytd-playlist-renderer')) {
+      for (const row of document.querySelectorAll('ytd-video-renderer, ytd-rich-item-renderer, ytd-reel-item-renderer, ytd-playlist-renderer, ytd-lockup-view-model, yt-lockup-view-model')) {
         const link = row.querySelector('a#video-title, a#video-title-link') || row.querySelector('a[href*="/watch?v="], a[href*="/shorts/"], a[href*="/playlist?list="]')
         const thumbLink = row.querySelector('a#thumbnail, a.ytd-thumbnail')
         if (!link) continue
@@ -74,9 +69,11 @@ const scrapeSearchScript = '(' + function () {
         const list = url.searchParams.get('list') || (thumbLink && new URL(thumbLink.href, location.href).searchParams.get('list')) || null
         let id = url.searchParams.get('v') || url.pathname.match(/\/shorts\/([a-zA-Z0-9_-]{11})/)?.[1] || null
         if (!id && thumbLink) id = new URL(thumbLink.href, location.href).searchParams.get('v') || null
+        if (!id && list && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(list)) id = list
         if (!id || seen.has(id)) continue
         const tag = row.tagName || ''
-        const type = tag.indexOf('REEL') !== -1 ? 'short' : tag.indexOf('PLAYLIST') !== -1 ? 'playlist' : 'video'
+        const hasV = !!url.searchParams.get('v')
+        const type = tag.indexOf('REEL') !== -1 ? 'short' : (tag.indexOf('PLAYLIST') !== -1 || !hasV) ? 'playlist' : 'video'
         const titleNode = row.querySelector('#video-title, #video-title-link') || link
         const title = (titleNode.getAttribute('title') || titleNode.textContent || '').replace(/\s+/g, ' ').trim()
         if (!title || /now playing/i.test(title)) continue
@@ -362,10 +359,6 @@ function YouTubeFloat() {
     let cancelled = false
     const done = async () => {
       try {
-        if (filter !== 'videos') {
-          try { await webview.executeJavaScript(clickFilterScript(filter), true) } catch {}
-          await new Promise(r => window.setTimeout(r, 1200))
-        }
         const found = await webview.executeJavaScript(scrapeSearchScript, true)
         if (cancelled) return
         const clean = Array.isArray(found) ? found.filter(v => v?.id && v?.title) : []
@@ -449,4 +442,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v53', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v54', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
