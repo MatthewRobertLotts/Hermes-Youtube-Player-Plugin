@@ -87,3 +87,7 @@
 ## v1.1
 
 - V23 overlays gone.
+
+## v1.2
+
+- V24 overlays subs play.

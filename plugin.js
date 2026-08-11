@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v23-overlays-gone'
+const VERSION = 'v24-overlays-subs-play'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -71,7 +71,7 @@ const scrapeSearchScript = '(' + function () {
 const stripScript = '(' + function () {
   const css = `
     html,body,ytd-app,#content,#page-manager,ytd-watch-flexy{background:#000!important;margin:0!important;padding:0!important;overflow:hidden!important}
-    ytd-masthead,#masthead-container,tp-yt-app-header,#header,#country-code,#secondary,#comments,#related,#chat,ytd-merch-shelf-renderer,.ytp-chrome-top,.ytp-chrome-bottom,.ytp-gradient-top,.ytp-gradient-bottom,.ytp-title,.ytp-title-text,.ytp-title-channel,.ytp-watermark,.ytp-ce-element,.ytp-cards-button,.ytp-iv-player-content{display:none!important}
+    ytd-masthead,#masthead-container,tp-yt-app-header,#header,#country-code,#secondary,#comments,#related,#chat,ytd-merch-shelf-renderer,.ytp-chrome-top,.ytp-chrome-bottom,.ytp-gradient-top,.ytp-gradient-bottom,.ytp-title,.ytp-title-text,.ytp-title-channel,.ytp-watermark,.ytp-ce-element,.ytp-cards-button,.ytp-iv-player-content,ytd-watch-metadata,#below,#meta,#info,#info-container,#title,#title-container,ytd-video-primary-info-renderer,ytd-video-secondary-info-renderer,ytd-comments,#description,#description-inline-expander{display:none!important}
     ytd-watch-flexy #columns,ytd-watch-flexy #primary,ytd-watch-flexy #primary-inner{margin:0!important;padding:0!important;width:100vw!important;max-width:none!important}
     #movie_player,.html5-video-player,.html5-video-container{width:100vw!important;height:100vh!important;max-height:100vh!important;min-width:0!important}
     html,body,ytd-app{pointer-events:none!important;user-select:none!important}
@@ -87,25 +87,48 @@ function driveScript(action, value) {
     const p = document.getElementById('movie_player')
     const v = document.querySelector('video')
     if (payload.action === 'loop' && v) v.loop = Boolean(payload.value)
-    const cmd = value => { try { return typeof value === 'function' ? value() : undefined } catch (e) { return { __err: String(e) } } }
+    const pausedOf = () => {
+      if (p && typeof p.getPlayerState === 'function') return p.getPlayerState() === 2
+      if (p && typeof p.isPaused === 'function') return p.isPaused()
+      return v ? v.paused : true
+    }
     if (p && typeof p.getCurrentTime === 'function') {
-      if (payload.action === 'playPause') { p.isPaused && p.isPaused() ? p.playVideo() : p.pauseVideo() }
+      if (payload.action === 'playPause') { pausedOf() ? p.playVideo() : p.pauseVideo() }
       else if (payload.action === 'seek') p.seekTo(Number(payload.value), true)
       else if (payload.action === 'rewind') p.seekTo(p.getCurrentTime() - 10, true)
       else if (payload.action === 'forward') p.seekTo(p.getCurrentTime() + 10, true)
       else if (payload.action === 'quality' && payload.value !== 'auto') { try { p.setPlaybackQuality(payload.value) } catch (e) {} }
-      return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true) }
+      else if (payload.action === 'caption') {
+        try {
+          if (payload.value === 'off') { p.setOption('captions', 'track', {}); p.setOption('captions', 'reload', true) }
+          else {
+            const tl = (p.getOption('captions', 'tracklist') || {}).tracks || []
+            const t = tl.find(x => x.languageCode === payload.value || x.displayName === payload.value)
+            if (t) { p.setOption('captions', 'track', { languageCode: t.languageCode }); p.setOption('captions', 'reload', true) }
+          }
+        } catch (e) {}
+      }
+      return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: pausedOf() }
     }
     if (v) {
       if (payload.action === 'playPause') v.paused ? v.play() : v.pause()
       else if (payload.action === 'seek') v.currentTime = Math.max(0, Math.min(v.duration || payload.value, Number(payload.value) || 0))
       else if (payload.action === 'rewind') v.currentTime = Math.max(0, v.currentTime - 10)
       else if (payload.action === 'forward') v.currentTime = Math.min(v.duration || v.currentTime + 10, v.currentTime + 10)
+      else if (payload.action === 'caption') { for (const t of v.textTracks || []) t.mode = payload.value && (t.language === payload.value || t.label === payload.value) ? 'showing' : 'disabled' }
       return { ok: true, current: v.currentTime, duration: v.duration || 0, paused: v.paused }
     }
     return { ok: false }
   }.toString() + ')(' + JSON.stringify({ action, value }) + ')'
 }
+
+const tracksScript = '(' + function () {
+  try {
+    const p = document.getElementById('movie_player')
+    const tl = (p.getOption('captions', 'tracklist') || {}).tracks || []
+    return tl.map(t => ({ lang: t.languageCode || '', label: t.displayName || t.languageCode || '' }))
+  } catch (e) { return [] }
+}.toString() + ')()'
 
 const stateScript = '(' + function () {
   const p = document.getElementById('movie_player')
@@ -155,13 +178,17 @@ function YouTubeFloat() {
     setStatus('Loading…')
   }
 
-  // Playback pipeline: webview loads watch page (for session), we extract a
-  // direct stream URL and inject our own full-size <video> into that webview.
+  // Player loads the watch page; we strip chrome, default captions off, and read the subtitle list.
   useEffect(() => {
     const webview = playerRef.current
     if (!webview || !videoId) return undefined
     const ready = async () => {
-      try { await webview.executeJavaScript(stripScript, true) } catch {}
+      try {
+        await webview.executeJavaScript(stripScript, true)
+        await webview.executeJavaScript(driveScript('caption', 'off'), true)
+        const t = await webview.executeJavaScript(tracksScript, true)
+        if (Array.isArray(t) && t.length) setCaptions(t)
+      } catch {}
     }
     webview.addEventListener('dom-ready', ready)
     return () => webview.removeEventListener('dom-ready', ready)
@@ -249,4 +276,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v23', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v24', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
