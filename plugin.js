@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v60-playlist-to-results'
+const VERSION = 'v61-playlist-typing'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -92,12 +92,16 @@ const scrapeSearchScript = '(' + function () {
       let title = ''
       try { title = lv.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}
       const thumb = firstThumb(lv.contentImage)
-      if (ct.indexOf('SHORT') !== -1) push(lv.contentId, String(title).replace(/\s+/g, ' ').trim(), thumb, '', 'short', null)
-      else if (ct.indexOf('VIDEO') !== -1 || ct.indexOf('FULL') !== -1) {
+      const id = lv.contentId
+      // Types vary (PLAYLIST, PODCAST, sometimes both) — the id prefix is the reliable playlist
+      // signal; contentType alone can't be trusted.
+      if (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(id)) push(id, String(title).replace(/\s+/g, ' ').trim(), thumb, '', 'playlist', id)
+      else if (ct.indexOf('SHORT') !== -1) push(id, String(title).replace(/\s+/g, ' ').trim(), thumb, '', 'short', null)
+      else {
         let dur = ''
         try { const ov = lv.contentImage.thumbnailViewModel.overlays; dur = (ov || []).map(x => x.thumbnailBottomOverlayViewModel && x.thumbnailBottomOverlayViewModel.badges && x.thumbnailBottomOverlayViewModel.badges[0] && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel.text || '').find(Boolean) || '' } catch (e) {}
-        push(lv.contentId, String(title).replace(/\s+/g, ' ').trim(), thumb, String(dur).trim(), 'video', null)
-      } else if (ct.indexOf('PLAYLIST') !== -1) push(lv.contentId, String(title).replace(/\s+/g, ' ').trim(), thumb, '', 'playlist', lv.contentId)
+        push(id, String(title).replace(/\s+/g, ' ').trim(), thumb, String(dur).trim(), 'video', null)
+      }
     }
     const pr = o.playlistRenderer
     if (pr && pr.playlistId) {
@@ -283,10 +287,13 @@ const stateScript = '(' + function () {
   if (flag) window.__hermesEnded = 0
   const p = document.getElementById('movie_player')
   const ended = v ? v.ended : false
+  let vid = ''
+  try { vid = (p && typeof p.getVideoData === 'function' && p.getVideoData().video_id) || '' } catch (e) {}
+  if (!vid) { const m = location.href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || location.pathname.match(/\/(?:shorts|embed)\/([a-zA-Z0-9_-]{11})/); vid = m ? m[1] : '' }
   if (p && typeof p.getCurrentTime === 'function') {
-    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true), ended, endedFlag: flag }
+    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true), ended, endedFlag: flag, videoId: vid }
   }
-  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true, ended, endedFlag: flag }
+  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid }
 }.toString() + ')()'
 
 const playlistScrapeScript = '(' + function () {
@@ -367,6 +374,7 @@ function YouTubeFloat() {
     nativeRef.current = false
     setStreams([])
     setStatus('Loading…')
+    driftGuardRef.current = Date.now() + 2000
   }
 
   // Player loads the watch page; we strip chrome, default captions off, and read the subtitle list.
@@ -400,12 +408,13 @@ function YouTubeFloat() {
   resultsRef.current = results
   const indexRef = useRef(currentIndex)
   indexRef.current = currentIndex
-  const videoIdRef = useRef(videoId)
-  videoIdRef.current = videoId
   const playlistStateRef = useRef(playlist)
   playlistStateRef.current = playlist
   const queueModeRef = useRef(queueMode)
   queueModeRef.current = queueMode
+  // Window after a capture during which a mismatched player videoId is expected (page reload);
+  // only treat mismatches as drift once it expires.
+  const driftGuardRef = useRef(0)
   useEffect(() => {
     if (!videoId) return undefined
     const timer = window.setInterval(async () => {
@@ -416,8 +425,12 @@ function YouTubeFloat() {
         const r = await playerRef.current?.executeJavaScript(stateScript, true)
         if (!r || !r.ok) return
         setProgress({ current: r.current, duration: r.duration, paused: r.paused })
-        if (!(r.ended || r.endedFlag || (r.duration > 10 && r.current >= r.duration - 0.8))) return
         const list = resultsRef.current
+        const expected = list[indexRef.current]?.id
+        // YouTube's own up-next can start a video we never asked for before our poll notices the
+        // end (shorts hand over in <450ms). Heard about it via the player's current video id.
+        const drift = !!expected && !!r.videoId && r.videoId !== expected && Date.now() > driftGuardRef.current
+        if (!(r.ended || r.endedFlag || (r.duration > 10 && r.current >= r.duration - 0.8) || drift)) return
         const cur = list[indexRef.current]
         const qm = queueModeRef.current
         const pl = playlistStateRef.current
@@ -593,8 +606,8 @@ function YouTubeFloat() {
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
       jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' })
     ] }),
-    results.length ? jsx('div', { className: 'max-h-[30vh] min-h-0 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', result.id === videoId ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, result.id === videoId ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'min-h-0 flex-1 border-t border-white/10 px-2 py-2 text-[11px] text-(--ui-text-quaternary)', children: status === 'Searching YouTube…' ? 'Searching… results will appear here.' : status })
+    results.length ? jsx('div', { className: 'max-h-[30vh] min-h-0 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', result.id === videoId ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), result.type === 'playlist' ? jsx('span', { className: 'shrink-0 rounded bg-(--ui-accent)/20 px-1 py-0.5 text-[9px] font-medium text-(--ui-accent)', children: '▶ Playlist' }) : null, jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, result.id === videoId ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'min-h-0 flex-1 border-t border-white/10 px-2 py-2 text-[11px] text-(--ui-text-quaternary)', children: status === 'Searching YouTube…' ? 'Searching… results will appear here.' : status })
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v60', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v61', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

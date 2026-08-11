@@ -235,3 +235,7 @@
 ## v2.10
 
 - Fix playlist results startup crash.
+
+## v2.11
+
+- V61 playlist typing.
