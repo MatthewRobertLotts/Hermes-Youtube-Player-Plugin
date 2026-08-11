@@ -119,3 +119,7 @@
 ## v1.9
 
 - V31 quality captions real.
+
+## v1.10
+
+- V32 captions dual path.

@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v31-quality-captions-real'
+const VERSION = 'v32-captions-dual-path'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -195,7 +195,10 @@ function captionApplyScript(capUrl, lang) {
       let tr = Array.from(video.children || []).find(c => c && c.tagName === 'TRACK')
       if (!tr) { tr = document.createElement('track'); tr.kind = 'subtitles'; tr.srclang = l || 'en'; video.appendChild(tr) }
       tr.src = url
-      tr.mode = 'showing'
+      const show = () => { tr.mode = 'showing' }
+      if (tr.readyState >= 2) show()
+      else tr.addEventListener('load', show, { once: true })
+      window.setTimeout(show, 350)
     }).catch(() => undefined)
     return true
   }.toString() + ')(' + JSON.stringify(capUrl || '') + ',' + JSON.stringify(lang || 'en') + ')'
@@ -285,6 +288,9 @@ function YouTubeFloat() {
     try {
       if (action === 'caption') {
         const cap = captions.find(c => c.lang === value || c.label === value)
+        // 1) YouTube's own caption controller (renders in the whitelisted caption window).
+        await playerRef.current?.executeJavaScript(driveScript('caption', value), true)
+        // 2) Native <track> fallback (browser-rendered over the video).
         await playerRef.current?.executeJavaScript(captionApplyScript(value === 'off' ? '' : (cap && cap.url), value === 'off' ? '' : (cap && cap.lang)), true)
         return
       }
@@ -362,4 +368,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v31', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v32', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
