@@ -103,3 +103,7 @@
 ## v1.5
 
 - V27 sniper clean.
+
+## v1.6
+
+- V28 whitelist video.

@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v27-sniper-clean'
+const VERSION = 'v28-whitelist-video'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -84,17 +84,16 @@ const stripScript = '(' + function () {
   if (!window.__hermesSniper) {
     window.__hermesSniper = true
     const snipe = () => {
-      const player = document.getElementById('movie_player')
-      if (!player) return
-      player.querySelectorAll('*').forEach(el => {
-        if (el.tagName === 'VIDEO' || el.tagName === 'TRACK') return
-        if (el.classList && (el.classList.contains('html5-video-container') || el.classList.contains('html5-video-player') || el.classList.contains('ytp-caption-window-container') || el.classList.contains('ytp-caption-window'))) return
+      const vid = document.querySelector('video')
+      document.querySelectorAll('body *').forEach(el => {
+        if (el.classList && (el.classList.contains('ytp-caption-window') || el.classList.contains('ytp-caption-window-container'))) return
+        if (!vid) { try { el.style.setProperty('visibility', 'hidden', 'important') } catch (e) {}; return }
+        const inPath = el === vid || (vid.contains && vid.contains(el)) || (el.contains && el.contains(vid))
+        if (inPath) return
         try { el.style.setProperty('visibility', 'hidden', 'important') } catch (e) {}
       })
-      const vc = player.querySelector('.html5-video-container')
-      if (vc) { vc.style.setProperty('visibility', 'visible', 'important'); vc.style.setProperty('position', 'absolute', 'important'); vc.style.setProperty('inset', '0', 'important'); vc.style.setProperty('width', '100%', 'important'); vc.style.setProperty('height', '100%', 'important'); vc.style.setProperty('overflow', 'hidden', 'important') }
-      const vid = player.querySelector('video')
-      if (vid) { vid.style.setProperty('visibility', 'visible', 'important'); vid.style.setProperty('width', '100%', 'important'); vid.style.setProperty('height', '100%', 'important'); vid.style.setProperty('object-fit', 'contain', 'important') }
+      let a = vid, n = 0
+      while (a && n < 40) { try { a.style.setProperty('visibility', 'visible', 'important') } catch (e) {}; a = a.parentElement; n++ }
     }
     snipe()
     new MutationObserver(snipe).observe(document.documentElement, { childList: true, subtree: true })
@@ -297,4 +296,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v27', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v28', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
