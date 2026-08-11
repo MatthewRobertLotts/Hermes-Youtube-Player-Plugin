@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v37-compact-controls'
+const VERSION = 'v38-static-dropdowns'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -362,6 +362,12 @@ function YouTubeFloat() {
   const play = (result, index) => { capture(result.id); setCurrentIndex(index) }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   const pill = active => cn('rounded-full border px-2.5 py-1 text-xs transition', active ? 'border-(--ui-accent) bg-(--ui-accent) text-(--ui-accent-contrast)' : 'border-(--ui-border-muted) text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)')
+  // Static-label dropdown: pill shows a fixed name; an invisible real <select> sits on top so the
+  // native picker still opens. Fixed width keeps the bar from reflowing as selections change.
+  const Dd = ({ children, disabled, label, onChange, title, value }) => jsxs('div', { className: 'relative', title, children: [
+    jsx('button', { className: 'pointer-events-none flex h-6 w-[68px] items-center justify-between gap-1 rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs text-(--ui-text-secondary) disabled:opacity-50', type: 'button', children: [jsx('span', { className: 'truncate', children: label }), jsx('span', { children: '▾' })] }),
+    jsx('select', { className: 'absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:opacity-50', disabled, onChange, value, children })
+  ] })
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, children: [
@@ -377,9 +383,9 @@ function YouTubeFloat() {
       jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [jsx('span', { children: fmt(progress.current) }), jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: progress.duration || 0, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setProgress({ ...progress, current: v }); void runCommand('seek', v) }, type: 'range', value: Math.min(progress.current, progress.duration || progress.current) }), jsx('span', { children: fmt(progress.duration) })] }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
-                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', value: playerSize, children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
-                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, title: 'Quality', value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) })
-              ] }),
+                        jsx(Dd, { label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', value: playerSize, children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
+                        jsx(Dd, { disabled: !videoId, label: 'Quality', onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, title: 'Video quality', value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) })
+                      ] }),
               jsxs('div', { className: 'flex items-center gap-1.5', children: [
                 jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(-1), title: 'Previous video', type: 'button', children: '⏮' }),
                 jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runCommand('rewind'), title: 'Rewind 10s', type: 'button', children: '-10s' }),
@@ -388,9 +394,9 @@ function YouTubeFloat() {
                 jsx('button', { className: pill(false), disabled: !videoId, onClick: () => playOffset(1), title: 'Next video', type: 'button', children: '⏭' })
               ] }),
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-end gap-1.5', children: [
-                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => { setLoopMode(e.currentTarget.value); void runCommand('loop', e.currentTarget.value) }, title: 'Loop mode', value: loopMode, children: [jsx('option', { value: 'off', children: 'Off' }, 'off'), jsx('option', { value: 'once', children: 'Once' }, 'once'), jsx('option', { value: 'inf', children: '∞' }, 'inf')] }),
-                jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { captionRef.current = e.currentTarget.value; setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) }, title: 'Subtitles', value: caption, children: [jsx('option', { value: 'off', children: 'Off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
-              ] })
+                        jsx(Dd, { label: 'Loop', onChange: e => { setLoopMode(e.currentTarget.value); void runCommand('loop', e.currentTarget.value) }, title: 'Loop mode', value: loopMode, children: [jsx('option', { value: 'off', children: 'Off' }, 'off'), jsx('option', { value: 'once', children: 'Once' }, 'once'), jsx('option', { value: 'inf', children: '∞' }, 'inf')] }),
+                        jsx(Dd, { disabled: !videoId, label: 'Subs', onChange: e => { captionRef.current = e.currentTarget.value; setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) }, title: 'Subtitles', value: caption, children: [jsx('option', { value: 'off', children: 'Off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
+                      ] })
             ] }),
     ] }),
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
@@ -402,4 +408,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v37', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v38', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

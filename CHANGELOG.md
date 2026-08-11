@@ -143,3 +143,7 @@
 ## v1.15
 
 - V37 compact controls.
+
+## v1.16
+
+- V38 static dropdowns.
