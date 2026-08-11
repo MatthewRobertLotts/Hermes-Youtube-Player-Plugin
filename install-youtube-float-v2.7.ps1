@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v56-ended-flag-context-advance') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v57-json-playlist-self-heal') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v56-ended-flag-context-advance to:'
+Write-Host 'Installed YouTube Float v57-json-playlist-self-heal to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v56.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v57.'

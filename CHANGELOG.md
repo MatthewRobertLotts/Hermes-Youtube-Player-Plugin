@@ -219,3 +219,7 @@
 ## v2.6
 
 - V56 ended flag context advance.
+
+## v2.7
+
+- V57 json playlist self heal.

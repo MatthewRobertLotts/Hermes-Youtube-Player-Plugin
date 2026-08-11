@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v56-ended-flag-context-advance'
+const VERSION = 'v57-json-playlist-self-heal'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -251,10 +251,15 @@ function captionApplyScript(capUrl, lang) {
 }
 
 const stateScript = '(' + function () {
-  const p = document.getElementById('movie_player')
   const v = document.querySelector('video')
-  const flag = window.__hermesEnded || 0
+  // Self-healing ended marker: attach the listener here every tick so a too-fast page
+  // (or a replaced <video> element) can never leave us deaf to playback end.
+  if (v && !v.__hermesEnded) { v.__hermesEnded = 1; v.addEventListener('ended', () => { window.__hermesEnded = Date.now() }) }
+  const raw = window.__hermesEnded || 0
+  if (raw && Date.now() - raw > 15000) window.__hermesEnded = 0
+  const flag = raw ? window.__hermesEnded : 0
   if (flag) window.__hermesEnded = 0
+  const p = document.getElementById('movie_player')
   const ended = v ? v.ended : false
   if (p && typeof p.getCurrentTime === 'function') {
     return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true), ended, endedFlag: flag }
@@ -263,26 +268,39 @@ const stateScript = '(' + function () {
 }.toString() + ')()'
 
 const playlistScrapeScript = '(' + function () {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const out = []
-      const seen = new Set()
-      for (const row of document.querySelectorAll('ytd-playlist-video-renderer, ytd-playlist-panel-video-renderer, ytd-lockup-view-model, yt-lockup-view-model')) {
-        const a = row.querySelector('a#wc-endpoint, a#video-title-link, a[href*="/watch?v="]')
-        if (!a) continue
-        const u = new URL(a.href, location.href)
-        const id = u.searchParams.get('v')
-        if (!id || seen.has(id)) continue
+  const out = []
+  const seen = new Set()
+  const walk = o => {
+    if (out.length >= 60 || !o) return
+    if (Array.isArray(o)) { for (const x of o) walk(x); return }
+    if (typeof o !== 'object') return
+    const lv = o.lockupViewModel
+    if (lv && lv.contentId && (lv.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO' || lv.contentType === 'LOCKUP_CONTENT_TYPE_SHORT_VIDEO')) {
+      const id = lv.contentId
+      if (/^[a-zA-Z0-9_-]{11}$/.test(id) && !seen.has(id)) {
         seen.add(id)
-        const title = (a.getAttribute('title') || a.textContent || '').replace(/\s+/g, ' ').trim()
-        if (!title) continue
-        const dur = (row.querySelector('.badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer span')?.textContent || '').replace(/\s+/g, ' ').trim()
-        out.push({ duration: dur, id, title })
-        if (out.length >= 60) break
+        let title = ''
+        try { title = lv.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}
+        let dur = ''
+        try {
+          const ov = lv.contentImage && lv.contentImage.thumbnailViewModel && lv.contentImage.thumbnailViewModel.overlays
+          dur = (ov || []).map(x => x.thumbnailBottomOverlayViewModel && x.thumbnailBottomOverlayViewModel.badges && x.thumbnailBottomOverlayViewModel.badges[0] && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel.text || '').find(Boolean) || ''
+        } catch (e) {}
+        title = String(title).replace(/\s+/g, ' ').trim()
+        if (title) out.push({ duration: String(dur).trim(), id, title })
       }
-      resolve(out)
-    }, 2200)
-  })
+    }
+    const pvr = o.playlistVideoRenderer
+    if (pvr && pvr.videoId && !seen.has(pvr.videoId)) {
+      seen.add(pvr.videoId)
+      const title = ((pvr.title && (pvr.title.simpleText || (pvr.title.runs && pvr.title.runs[0] && pvr.title.runs[0].text))) || '').replace(/\s+/g, ' ').trim()
+      const dur = ((pvr.lengthText && (pvr.lengthText.simpleText || (pvr.lengthText.runs && pvr.lengthText.runs[0] && pvr.lengthText.runs[0].text))) || '').trim()
+      if (title) out.push({ duration: dur, id: pvr.videoId, title })
+    }
+    for (const k in o) walk(o[k])
+  }
+  try { walk(window.ytInitialData) } catch (e) {}
+  return out
 }.toString() + ')()'
 
 function YouTubeFloat() {
@@ -387,13 +405,19 @@ function YouTubeFloat() {
           const idx = items.findIndex(i => i.id === videoIdRef.current)
           if (idx !== -1 && items[idx + 1]) next = items[idx + 1]
         }
-        // 2) Shorts chain: only ever hand over to another short in the results.
-        if (!next && cur && cur.type === 'short' && list[indexRef.current + 1] && list[indexRef.current + 1].type === 'short') {
-          next = list[indexRef.current + 1]
+        // 2) Shorts chain: only ever hand over to another short in the results — including wrap-around to the first.
+        if (!next && cur && cur.type === 'short') {
+          const nxt = list[indexRef.current + 1]
+          if (nxt && nxt.type === 'short') next = nxt
+          else {
+            const first = list.findIndex(i => i.type === 'short')
+            if (first !== -1) next = list[first]
+          }
         }
         if (next) {
           capture(next.id, pl || next.list)
-          if (next === list[indexRef.current + 1]) setCurrentIndex(indexRef.current + 1)
+          const idx = list.indexOf(next)
+          if (idx !== -1) setCurrentIndex(idx)
         } else {
           // Nothing valid to follow: stop playback rather than let YouTube pull in irrelevant content.
           await playerRef.current?.executeJavaScript('const v=document.querySelector("video"); if (v) v.pause()', true).catch(() => {})
@@ -539,4 +563,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v56', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v57', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
