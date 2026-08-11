@@ -163,3 +163,7 @@
 ## v1.20
 
 - V42 popup survives.
+
+## v1.21
+
+- V43 quality tick.
