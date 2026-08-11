@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/feature-video.png" alt="Real YouTube playback" width="680">
-</p>
-
 <h1 align="center">Hermes YouTube Player Plugin</h1>
 
 <p align="center">
@@ -13,6 +9,10 @@
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
   <img src="https://img.shields.io/badge/Current-v3.0%E2%98%85-22498e" alt="Current v3.0">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
+</p>
+
+<p align="center">
+  <img src="assets/feature-video.png" alt="Real YouTube playback" width="680">
 </p>
 
 ---
