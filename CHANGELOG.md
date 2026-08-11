@@ -111,3 +111,7 @@
 ## v1.7
 
 - V29 next prev fix.
+
+## v1.8
+
+- V30 quality subs.

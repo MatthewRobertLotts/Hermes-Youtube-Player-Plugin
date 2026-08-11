@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v29-next-prev-fix'
+const VERSION = 'v30-quality-subs'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -119,6 +119,7 @@ function driveScript(action, value) {
       else if (payload.action === 'forward') p.seekTo(p.getCurrentTime() + 10, true)
       else if (payload.action === 'quality' && payload.value !== 'auto') { try { p.setPlaybackQuality(payload.value) } catch (e) {} }
       else if (payload.action === 'caption') {
+        for (const tr of (v && v.textTracks ? v.textTracks : [])) tr.mode = payload.value && (tr.language === payload.value || tr.label === payload.value) ? 'showing' : 'disabled'
         try {
           if (payload.value === 'off') { p.setOption('captions', 'track', {}); p.setOption('captions', 'reload', true) }
           else {
@@ -142,12 +143,20 @@ function driveScript(action, value) {
   }.toString() + ')(' + JSON.stringify({ action, value }) + ')'
 }
 
-const tracksScript = '(' + function () {
-  try {
-    const p = document.getElementById('movie_player')
-    const tl = (p.getOption('captions', 'tracklist') || {}).tracks || []
-    return tl.map(t => ({ lang: t.languageCode || '', label: t.displayName || t.languageCode || '' }))
-  } catch (e) { return [] }
+const readPlayerScript = '(' + function () {
+  const p = document.getElementById('movie_player')
+  const v = document.querySelector('video')
+  let levels = []
+  try { levels = (p && typeof p.getAvailableQualityLevels === 'function' && p.getAvailableQualityLevels()) || [] } catch (e) {}
+  const seen = new Set()
+  const tracks = []
+  for (const t of ((v && v.textTracks) || [])) {
+    const lang = t.language || ''; const label = t.label || t.language
+    if (!label || seen.has(label)) continue
+    seen.add(label)
+    tracks.push({ lang, label })
+  }
+  return { levels, tracks }
 }.toString() + ')()'
 
 const stateScript = '(' + function () {
@@ -206,8 +215,11 @@ function YouTubeFloat() {
       try {
         await webview.executeJavaScript(stripScript, true)
         await webview.executeJavaScript(driveScript('caption', 'off'), true)
-        const t = await webview.executeJavaScript(tracksScript, true)
-        if (Array.isArray(t) && t.length) setCaptions(t)
+        const r = await webview.executeJavaScript(readPlayerScript, true)
+        if (r) {
+          if (Array.isArray(r.levels) && r.levels.length) setQualities(['auto', ...r.levels])
+          if (Array.isArray(r.tracks) && r.tracks.length) setCaptions(r.tracks)
+        }
       } catch {}
     }
     webview.addEventListener('dom-ready', ready)
@@ -296,4 +308,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v29', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v30', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
