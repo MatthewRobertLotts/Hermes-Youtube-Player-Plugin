@@ -195,3 +195,7 @@
 ## v2.0
 
 - Lock player controls milestone.
+
+## v2.1
+
+- Add shorts and playlist result types.

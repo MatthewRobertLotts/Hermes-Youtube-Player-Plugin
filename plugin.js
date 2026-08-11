@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v50-text-buttons'
+const VERSION = 'v51-shorts-playlists'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -44,8 +44,9 @@ function videoIdFrom(input) {
   return null
 }
 
-function watchUrl(videoId) {
-  return videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' : 'about:blank'
+function watchUrl(videoId, playlistId) {
+  const base = videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' : 'about:blank'
+  return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
 function searchSrc(query, filter) {
   const suffix = filter === 'shorts' ? ' shorts' : filter === 'playlists' ? ' playlist' : ''
@@ -58,19 +59,24 @@ const scrapeSearchScript = '(' + function () {
       const seen = new Set()
       const out = []
       for (const row of document.querySelectorAll('ytd-video-renderer, ytd-rich-item-renderer, ytd-reel-item-renderer, ytd-playlist-renderer')) {
-        const link = row.querySelector('a#video-title') || row.querySelector('a[href*="/watch?v="], a[href*="/shorts/"]')
+        const link = row.querySelector('a#video-title, a#video-title-link') || row.querySelector('a[href*="/watch?v="], a[href*="/shorts/"], a[href*="/playlist?list="]')
+        const thumbLink = row.querySelector('a#thumbnail, a.ytd-thumbnail')
         if (!link) continue
         const url = new URL(link.href, location.href)
-        const id = url.searchParams.get('v') || url.pathname.match(/\/shorts\/([a-zA-Z0-9_-]{11})/)?.[1]
+        const list = url.searchParams.get('list') || (thumbLink && new URL(thumbLink.href, location.href).searchParams.get('list')) || null
+        let id = url.searchParams.get('v') || url.pathname.match(/\/shorts\/([a-zA-Z0-9_-]{11})/)?.[1] || null
+        if (!id && thumbLink) id = new URL(thumbLink.href, location.href).searchParams.get('v') || null
         if (!id || seen.has(id)) continue
-        const titleNode = row.querySelector('#video-title') || link
+        const tag = row.tagName || ''
+        const type = tag.indexOf('REEL') !== -1 ? 'short' : tag.indexOf('PLAYLIST') !== -1 ? 'playlist' : 'video'
+        const titleNode = row.querySelector('#video-title, #video-title-link') || link
         const title = (titleNode.getAttribute('title') || titleNode.textContent || '').replace(/\s+/g, ' ').trim()
-        if (!title || /now playing/i.test(title) || /^\d+:\d+/.test(title)) continue
+        if (!title || /now playing/i.test(title)) continue
         seen.add(id)
         const img = row.querySelector('img')
         const thumb = img?.src || img?.getAttribute('data-thumb') || 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg'
-        const duration = (row.querySelector('ytd-thumbnail-overlay-time-status-renderer span, .ytd-thumbnail-overlay-time-status-renderer')?.textContent || '').replace(/\s+/g, ' ').trim()
-        out.push({ duration, id, title, thumb })
+        const duration = (row.querySelector('ytd-thumbnail-overlay-time-status-renderer span, .ytd-thumbnail-overlay-time-status-renderer, ytd-thumbnail-overlay-time-status-renderer#time-status, .badge-shape-wiz__text')?.textContent || '').replace(/\s+/g, ' ').trim()
+        out.push({ duration, id, list, title, thumb, type })
         if (out.length >= 14) break
       }
       resolve(out)
@@ -252,6 +258,7 @@ function YouTubeFloat() {
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState('large')
   const [videoId, setVideoId] = useState(null)
+  const [playlist, setPlaylist] = useState(null)
   const [results, setResults] = useState([])
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [status, setStatus] = useState('Search for a video')
@@ -279,8 +286,9 @@ function YouTubeFloat() {
     window.dispatchEvent(new Event('resize'))
   }, [playerSize])
 
-  const capture = vid => {
+  const capture = (vid, list) => {
     setVideoId(vid)
+    setPlaylist(list || null)
     setNative(false)
     nativeRef.current = false
     setStreams([])
@@ -372,7 +380,7 @@ function YouTubeFloat() {
     setResults([])
     setSearchUrl(searchSrc(next, filter) + '&_=' + Date.now())
   }
-  const play = (result, index) => { capture(result.id); setCurrentIndex(index) }
+  const play = (result, index) => { capture(result.id, result.list); setCurrentIndex(index) }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   // Static-title select: value pinned to a disabled-capable placeholder option carrying the label,
@@ -396,7 +404,7 @@ function YouTubeFloat() {
       className: 'relative shrink-0 bg-black',
       style: { height: cfg().player },
       children: videoId
-        ? jsx('webview', { key: videoId, className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId) })
+        ? jsx('webview', { key: videoId, className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
         : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
@@ -429,4 +437,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v50', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v51', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
