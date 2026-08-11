@@ -183,3 +183,7 @@
 ## v1.25
 
 - V47 cluster solid.
+
+## v1.26
+
+- Balance control bar columns.

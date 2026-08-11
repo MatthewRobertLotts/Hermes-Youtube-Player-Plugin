@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v47-cluster-solid') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v48-equal-thirds') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v47-cluster-solid to:'
+Write-Host 'Installed YouTube Float v48-equal-thirds to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v47.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v48.'
