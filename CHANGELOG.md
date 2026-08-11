@@ -175,3 +175,7 @@
 ## v1.23
 
 - V45 revert swap.
+
+## v1.24
+
+- V46 solid dropdowns.
