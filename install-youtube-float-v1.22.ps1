@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v43-quality-tick') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v44-subs-loop-swap') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v43-quality-tick to:'
+Write-Host 'Installed YouTube Float v44-subs-loop-swap to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v43.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v44.'

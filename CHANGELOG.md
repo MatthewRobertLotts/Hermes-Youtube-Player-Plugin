@@ -167,3 +167,7 @@
 ## v1.21
 
 - V43 quality tick.
+
+## v1.22
+
+- V44 subs loop swap.
