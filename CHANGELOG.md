@@ -179,3 +179,7 @@
 ## v1.24
 
 - V46 solid dropdowns.
+
+## v1.25
+
+- V47 cluster solid.
