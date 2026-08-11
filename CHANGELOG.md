@@ -131,3 +131,7 @@
 ## v1.12
 
 - V34 cc click.
+
+## v1.13
+
+- V35 captions default off.

@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v34-cc-click'
+const VERSION = 'v35-captions-default-off'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -239,6 +239,7 @@ function YouTubeFloat() {
   const [quality, setQuality] = useState('auto')
   const [qualities, setQualities] = useState(['auto'])
   const [caption, setCaption] = useState('off')
+  const captionRef = useRef('off')
   const [captions, setCaptions] = useState([])
   const [progress, setProgress] = useState({ current: 0, duration: 0, paused: true })
   const [streams, setStreams] = useState([])
@@ -272,7 +273,7 @@ function YouTubeFloat() {
     const ready = async () => {
       try {
         await webview.executeJavaScript(stripScript, true)
-        await webview.executeJavaScript(driveScript('caption', 'off'), true)
+        await webview.executeJavaScript(driveScript('caption', captionRef.current), true)
         const r = await webview.executeJavaScript(readPlayerScript, true)
         if (r) {
           if (Array.isArray(r.levels) && r.levels.length) setQualities(['auto', ...r.levels])
@@ -285,7 +286,10 @@ function YouTubeFloat() {
       } catch {}
     }
     webview.addEventListener('dom-ready', ready)
-    return () => webview.removeEventListener('dom-ready', ready)
+    // Captions state settles after the player initializes; enforce the chosen state late so the
+    // session's remembered caption preference doesn't leak in.
+    const settle = window.setTimeout(() => { try { webview.executeJavaScript(driveScript('caption', captionRef.current), true) } catch {} }, 2500)
+    return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle) }
   }, [videoId])
 
   // Poll progress from YouTube's own player.
@@ -369,7 +373,7 @@ function YouTubeFloat() {
         jsx('button', { className: pill(false), disabled: !videoId, onClick: () => runCommand('forward'), type: 'button', children: '+10s' }),
         jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs', onChange: e => setPlayerSize(e.currentTarget.value), value: playerSize, children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
         jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, value: quality, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) }),
-        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
+        jsx('select', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1 text-xs disabled:opacity-50', disabled: !videoId, onChange: e => { captionRef.current = e.currentTarget.value; setCaption(e.currentTarget.value); void runCommand('caption', e.currentTarget.value) }, value: caption, children: [jsx('option', { value: 'off', children: 'Subs off' }, 'off'), ...captions.map(c => jsx('option', { value: c.lang, children: c.label }, c.lang))] })
       ] })
     ] }),
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
@@ -381,4 +385,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v34', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v35', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
