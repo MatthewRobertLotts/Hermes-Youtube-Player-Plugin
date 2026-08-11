@@ -22,16 +22,7 @@
 The player in action — 26 seconds:
 
 <p align="center">
-  <video controls width="560" poster="https://raw.githubusercontent.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/main/assets/feature-video.png">
-    <source src="https://raw.githubusercontent.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/main/assets/demo.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-</p>
-
-<p align="center">
-  <em>No player? Here's the same clip as a GIF:</em>
-  <br>
-  <img src="assets/demo.gif" alt="Hermes YouTube Player Plugin demo" width="480">
+  <img src="assets/demo.gif" alt="Hermes YouTube Player Plugin demo" width="520">
 </p>
 
 ---
