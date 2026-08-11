@@ -44,20 +44,37 @@ A floating desktop pane that brings YouTube straight into Hermes Desktop. It run
 
 ## Features
 
+A closer look at what's really under the hood (all backed by the live `plugin.js`):
+
 ### 🎬 Real YouTube player
-Uses YouTube's own watch-page webview and player API — quality, subtitles, playback speed and loop with none of the "black frame / audio only" nonsense that plagues custom players. The pane sizes to **Large / Medium / Small** presets and keeps video at a clean 16:9.
+Uses YouTube's own watch-page webview and player API. Because it's YouTube's **real** player — not a repackaged custom `<video>` — playback is full-fidelity with none of the "black frame / audio only" problems that plague scraped-stream players.
 
 ### ⌨️ Full transport controls
-`Prev` · `-10s` · **Play/Pause** · `+10s` · `Next`, a responsive scrubbing timeline, and Quality / Loop / Subs dropdowns.
+Everything you need mid-watch, all in one row:
+- **`Prev` / `Next`** — previous / next item (respects Shorts & playlist context)
+- **`-10s` / `+10s`** — fine-grained scene skip
+- **Play / Pause** and a responsive scrubbing **timeline** with live time/duration
+
+### ⚙️ Playback quality
+On-the-fly **Quality** selection via YouTube's own quality engine — Auto / 144p / 240p / 360p / 480p / 720p / 1080p — applied directly to the live player.
+
+### 💬 Subtitles & captions
+**Subs** control with on/off and automatic caption fallback (built-in + ASR-tracked caption sources), injected as a real `<track>` so they render inside the video.
+
+### 🔁 Loop — off / once / infinite
+Three-mode loop with a proper `ended` listener: play once and stop, or loop the clip forever. No drift, no stuck repeats.
 
 ### 📺 Search modes: Videos, Shorts, Playlists
 Pick a mode, type, and search. Results come straight from YouTube's own data — accurate thumbnails, durations, badges and playlist counts.
 
 ### ⏩ Shorts chaining
-Open a Short and the next one plays automatically. Drift detection snaps you back if YouTube tries to sneak in something you didn't ask for; pausing never advances.
+Open a Short and the next one plays automatically. **Drift detection** reads the live player's video id and snaps you back if YouTube auto-switches to something you didn't ask for; pausing never advances.
 
-### 📋 Playlist playthrough
-Click a playlist to load its full episode list, then let it **autoplay the first item and roll through to the end** — perfect for a long compilation or a full series binge.
+### ▶️ Playlist autostart & playthrough
+Click a playlist to load its full episode list, then it **autoplays the first item** and **rolls through to the end** — with an autostart fallback that reloads the proven `/watch?v=<id>&list=…&autoplay=1` path so playback never stalls on a cued-but-unstarted player.
+
+### 📐 Window presets
+Fitted **Large / Medium / Small** pane presets that keep the video at a clean 16:9, so the same player fits your layout whether it's a side panel or the main stage.
 
 ### 🤖 Ask about what's playing *(roadmap)*
 The player knows exactly what's on screen — title, channel, timestamp. A planned upgrade lets Hermes **recognize what you're playing and answer questions about it**, right from the pane.
