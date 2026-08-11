@@ -223,3 +223,7 @@
 ## v2.7
 
 - V57 json playlist self heal.
+
+## v2.8
+
+- Scrape modern youtube search json.

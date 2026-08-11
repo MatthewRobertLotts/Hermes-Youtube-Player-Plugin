@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v57-json-playlist-self-heal'
+const VERSION = 'v58-json-everything'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -57,36 +57,58 @@ function searchSrc(query, filter) {
 }
 
 const scrapeSearchScript = '(' + function () {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const seen = new Set()
-      const out = []
-      for (const row of document.querySelectorAll('ytd-video-renderer, ytd-rich-item-renderer, ytd-reel-item-renderer, ytd-playlist-renderer, ytd-lockup-view-model, yt-lockup-view-model')) {
-        const link = row.querySelector('a#video-title, a#video-title-link') || row.querySelector('a[href*="/watch?v="], a[href*="/shorts/"], a[href*="/playlist?list="]')
-        const thumbLink = row.querySelector('a#thumbnail, a.ytd-thumbnail')
-        if (!link) continue
-        const url = new URL(link.href, location.href)
-        const list = url.searchParams.get('list') || (thumbLink && new URL(thumbLink.href, location.href).searchParams.get('list')) || null
-        let id = url.searchParams.get('v') || url.pathname.match(/\/shorts\/([a-zA-Z0-9_-]{11})/)?.[1] || null
-        if (!id && thumbLink) id = new URL(thumbLink.href, location.href).searchParams.get('v') || null
-        if (!id && list && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(list)) id = list
-        if (!id || seen.has(id)) continue
-        const tag = row.tagName || ''
-        const hasV = !!url.searchParams.get('v')
-        const type = url.pathname.indexOf('/shorts/') !== -1 ? 'short' : (tag.indexOf('REEL') !== -1 ? 'short' : (tag.indexOf('PLAYLIST') !== -1 || !hasV ? 'playlist' : 'video'))
-        const titleNode = row.querySelector('#video-title, #video-title-link') || link
-        const title = (titleNode.getAttribute('title') || titleNode.textContent || '').replace(/\s+/g, ' ').trim()
-        if (!title || /now playing/i.test(title)) continue
-        seen.add(id)
-        const img = row.querySelector('img')
-        const thumb = img?.src || img?.getAttribute('data-thumb') || 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg'
-        const duration = (row.querySelector('ytd-thumbnail-overlay-time-status-renderer span, .ytd-thumbnail-overlay-time-status-renderer, ytd-thumbnail-overlay-time-status-renderer#time-status, .badge-shape-wiz__text')?.textContent || '').replace(/\s+/g, ' ').trim()
-        out.push({ duration, id, list, title, thumb, type })
-        if (out.length >= 14) break
-      }
-      resolve(out)
-    }, 1500)
-  })
+  const out = []
+  const seen = new Set()
+  const push = (id, title, thumb, duration, type, list) => {
+    if (!id || seen.has(id) || !title || /now playing/i.test(title)) return
+    seen.add(id)
+    out.push({ duration, id, list: list || null, title, thumb, type })
+  }
+  const txt = x => (x && (x.simpleText || ((x.runs || [{ text: '' }]).map(r => r.text).join('')))) || ''
+  const walk = o => {
+    if (out.length >= 14 || !o) return
+    if (Array.isArray(o)) { for (const x of o) walk(x); return }
+    if (typeof o !== 'object') return
+    const vr = o.videoRenderer
+    if (vr && vr.videoId) {
+      const url = (vr.navigationEndpoint && vr.navigationEndpoint.commandMetadata && vr.navigationEndpoint.commandMetadata.webCommandMetadata && vr.navigationEndpoint.commandMetadata.webCommandMetadata.url) || ''
+      const list = url.indexOf('list=') !== -1 ? ((url.match(/list=([^&]+)/) || [])[1] || null) : null
+      const img = vr.thumbnail && vr.thumbnail.thumbnails
+      push(vr.videoId, txt(vr.title).replace(/\s+/g, ' ').trim(), img && img[img.length - 1] ? img[img.length - 1].url : '', txt(vr.lengthText).trim(), url.indexOf('/shorts/') !== -1 ? 'short' : 'video', list)
+    }
+    const rr = o.reelItemRenderer
+    if (rr && rr.videoId) push(rr.videoId, txt(rr.headline).replace(/\s+/g, ' ').trim(), '', '', 'short', null)
+    const slv = o.shortsLockupViewModel
+    if (slv && slv.videoId) {
+      let t = String(slv.accessibilityText || '')
+      t = t.replace(/,?\s*\d[\d,.]*\s*(million|billion|k)?\s*views\s*[–-]\s*play\s*short$/i, '').replace(/\s*[–-]\s*play\s*short$/i, '').replace(/\s+/g, ' ').trim()
+      const img = slv.thumbnail && slv.thumbnail.thumbnails
+      push(slv.videoId, t, img && img[0] ? img[0].url : '', '', 'short', null)
+    }
+    const lv = o.lockupViewModel
+    if (lv && lv.contentId) {
+      const ct = lv.contentType || ''
+      let title = ''
+      try { title = lv.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}
+      let thumb = ''
+      try { thumb = lv.contentImage.thumbnailViewModel.image.sources[0].url || '' } catch (e) {}
+      if (ct.indexOf('SHORT') !== -1) push(lv.contentId, String(title).replace(/\s+/g, ' ').trim(), thumb, '', 'short', null)
+      else if (ct.indexOf('VIDEO') !== -1 || ct.indexOf('FULL') !== -1) {
+        let dur = ''
+        try { const ov = lv.contentImage.thumbnailViewModel.overlays; dur = (ov || []).map(x => x.thumbnailBottomOverlayViewModel && x.thumbnailBottomOverlayViewModel.badges && x.thumbnailBottomOverlayViewModel.badges[0] && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel.text || '').find(Boolean) || '' } catch (e) {}
+        push(lv.contentId, String(title).replace(/\s+/g, ' ').trim(), thumb, String(dur).trim(), 'video', null)
+      } else if (ct.indexOf('PLAYLIST') !== -1) push(lv.contentId, String(title).replace(/\s+/g, ' ').trim(), thumb, '', 'playlist', lv.contentId)
+    }
+    const pr = o.playlistRenderer
+    if (pr && pr.playlistId) {
+      let first = ''
+      try { first = (pr.navigationEndpoint && pr.navigationEndpoint.watchEndpoint && pr.navigationEndpoint.watchEndpoint.videoId) || '' } catch (e) {}
+      push(first || pr.playlistId, txt(pr.title).replace(/\s+/g, ' ').trim(), '', '', 'playlist', pr.playlistId)
+    }
+    for (const k in o) walk(o[k])
+  }
+  try { walk(window.ytInitialData) } catch (e) {}
+  return out
 }.toString() + ')()'
 
 const stripScript = '(' + function () {
@@ -418,9 +440,11 @@ function YouTubeFloat() {
           capture(next.id, pl || next.list)
           const idx = list.indexOf(next)
           if (idx !== -1) setCurrentIndex(idx)
+          setStatus('Auto: advanced to "' + (next.title || '').slice(0, 40) + '"')
         } else {
           // Nothing valid to follow: stop playback rather than let YouTube pull in irrelevant content.
           await playerRef.current?.executeJavaScript('const v=document.querySelector("video"); if (v) v.pause()', true).catch(() => {})
+          setStatus('End of list — paused')
         }
       } catch {}
     }, 450)
@@ -481,8 +505,11 @@ function YouTubeFloat() {
       try {
         const items = await webview.executeJavaScript(playlistScrapeScript, true)
         if (cancelled) return
-        setPlaylistItems(Array.isArray(items) ? items.filter(i => i.id && i.title) : [])
-      } catch {}
+        const clean = Array.isArray(items) ? items.filter(i => i.id && i.title) : []
+        setPlaylistItems(clean)
+        if (clean.length) setStatus('Playlist menu: ' + clean.length + ' videos')
+        else setStatus('Playlist menu: could not load (0 rows) — report this')
+      } catch (e) { if (!cancelled) setStatus('Playlist menu: load error') }
     }
     const ev = () => void grab()
     webview.addEventListener('dom-ready', ev, { once: true })
@@ -550,6 +577,7 @@ function YouTubeFloat() {
                       ] })
             ] }),
     ] }),
+    /(^Playlist|^Auto:|^End of list)/.test(status) ? jsx('div', { className: 'shrink-0 border-t border-white/10 px-3 py-1 text-[10px] text-(--ui-text-quaternary)', children: status }) : null,
     playlistItems.length ? jsxs('div', { className: 'max-h-[22vh] shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95', children: [
       jsx('div', { className: 'sticky top-0 border-b border-white/10 bg-(--ui-bg-elevated) px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-(--ui-text-tertiary)', children: 'Playlist' }),
       ...playlistItems.map(item => jsxs('button', { className: 'flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', onClick: () => capture(item.id, playlist), title: item.title, type: 'button', children: [jsx('span', { className: 'min-w-0 flex-1 truncate text-(--ui-text-secondary)', children: item.title }), item.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: item.duration }) : null] }, item.id))
@@ -563,4 +591,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v57', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v58', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
