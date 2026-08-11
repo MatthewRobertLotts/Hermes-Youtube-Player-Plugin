@@ -107,3 +107,7 @@
 ## v1.6
 
 - V28 whitelist video.
+
+## v1.7
+
+- V29 next prev fix.
