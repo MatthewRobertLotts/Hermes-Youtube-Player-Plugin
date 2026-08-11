@@ -251,3 +251,7 @@
 ## v2.14
 
 - V64 entry play.
+
+## v2.15
+
+- Guard playlist results from stale search writes.
