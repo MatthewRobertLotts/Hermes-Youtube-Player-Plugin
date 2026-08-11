@@ -95,3 +95,7 @@
 ## v1.3
 
 - V25 revert overlay.
+
+## v1.4
+
+- V26 pause overlay gone.
