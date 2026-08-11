@@ -203,3 +203,7 @@
 ## v2.2
 
 - V52 sp filter params.
+
+## v2.3
+
+- V53 chip click filter.

@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v52-sp-filter-params'
+const VERSION = 'v53-chip-click-filter'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -48,10 +48,18 @@ function watchUrl(videoId, playlistId) {
   const base = videoId ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' : 'about:blank'
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
-const SP_FILTERS = { videos: 'EgIQAQ%3D%3D', shorts: 'EgIQAUgF', playlists: 'EgIQAw%3D%3D' }
-function searchSrc(query, filter) {
-  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + '&sp=' + (SP_FILTERS[filter] || SP_FILTERS.videos)
+function searchSrc(query) {
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query)
 }
+
+const clickFilterScript = label => '(' + function (wanted) {
+  const wantedNorm = String(wanted).toLowerCase()
+  for (const node of document.querySelectorAll('ytd-search-filter-renderer')) {
+    const a = node.querySelector('a')
+    if (a && (a.textContent || '').trim().toLowerCase() === wantedNorm) { a.click(); return true }
+  }
+  return false
+}.toString() + ')(' + JSON.stringify(label) + ')'
 
 const scrapeSearchScript = '(' + function () {
   return new Promise(resolve => {
@@ -354,6 +362,10 @@ function YouTubeFloat() {
     let cancelled = false
     const done = async () => {
       try {
+        if (filter !== 'videos') {
+          try { await webview.executeJavaScript(clickFilterScript(filter), true) } catch {}
+          await new Promise(r => window.setTimeout(r, 1200))
+        }
         const found = await webview.executeJavaScript(scrapeSearchScript, true)
         if (cancelled) return
         const clean = Array.isArray(found) ? found.filter(v => v?.id && v?.title) : []
@@ -437,4 +449,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v52', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v53', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

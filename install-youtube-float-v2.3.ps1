@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v52-sp-filter-params') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v53-chip-click-filter') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v52-sp-filter-params to:'
+Write-Host 'Installed YouTube Float v53-chip-click-filter to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v52.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v53.'
