@@ -147,3 +147,7 @@
 ## v1.16
 
 - V38 static dropdowns.
+
+## v1.17
+
+- V39 static titles.

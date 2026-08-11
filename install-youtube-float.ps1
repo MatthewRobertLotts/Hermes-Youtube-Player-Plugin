@@ -19,9 +19,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v38-static-dropdowns') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v39-static-titles') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v38-static-dropdowns to:'
+Write-Host 'Installed YouTube Float v39-static-titles to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v38.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v39.'
