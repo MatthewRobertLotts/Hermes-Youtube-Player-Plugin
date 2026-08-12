@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.33
+- Placement switching now resumes the current video after pin/unpin.
+- Saves a short-lived handoff snapshot: video id, playlist id, timestamp, and paused state.
+- Restores/clears that snapshot on the newly mounted pane; it is not long-term reopen autoplay.
+
 ## v3.32
 - Replaced the Place dropdown with a pin/unpin icon button.
 - Moved placement toggle to the left of the timeline, mirroring the volume button on the right.

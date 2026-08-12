@@ -2,7 +2,7 @@ import { cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.32-pin-placement-toggle'
+const VERSION = 'v3.33-seamless-placement-switch'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -15,6 +15,7 @@ const SEARCH_FILTERS = [
 const HISTORY_KEY = 'hermes-yt-history'
 const PREF_KEY = 'hermes-yt-prefs'
 const HISTORY_MAX = 50
+const SWITCH_RESUME_MS = 120000
 let pluginStorage = null
 let setPlayerPlacement = null
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
@@ -404,12 +405,13 @@ const playlistFillScript = '(' + function () {
 
 function YouTubeFloat() {
   const prefs = useMemo(readPrefs, [])
+  const resume = prefs.resume && Date.now() - prefs.resume.at < SWITCH_RESUME_MS ? prefs.resume : null
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState(PLAYER_SIZES[prefs.playerSize] ? prefs.playerSize : 'large')
   const [placement, setPlacement] = useState(prefs.placement === 'floating' ? 'floating' : 'docked')
-  const [videoId, setVideoId] = useState(null)
-  const [playlist, setPlaylist] = useState(null)
+  const [videoId, setVideoId] = useState(resume?.videoId || null)
+  const [playlist, setPlaylist] = useState(resume?.playlist || null)
   const [queueMode, setQueueMode] = useState('search')
   const [results, setResults] = useState([])
   const [currentIndex, setCurrentIndex] = useState(-1)
@@ -421,7 +423,8 @@ function YouTubeFloat() {
   const [caption, setCaption] = useState(prefs.caption || 'off')
   const captionRef = useRef(caption)
   const [captions, setCaptions] = useState([])
-  const [progress, setProgress] = useState({ current: 0, duration: 0, paused: true })
+  const [progress, setProgress] = useState({ current: resume?.current || 0, duration: 0, paused: resume ? resume.paused !== false : true })
+  const resumeRef = useRef(resume)
   const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
   const [volumeOpen, setVolumeOpen] = useState(false)
   const [loginPane, setLoginPane] = useState(false)
@@ -514,7 +517,8 @@ function YouTubeFloat() {
   }, [playerSize])
 
   useEffect(() => {
-    savePrefs({ playerSize, placement, volume, loopMode, quality, caption })
+    const existing = readPrefs().resume
+    savePrefs({ playerSize, placement, volume, loopMode, quality, caption, resume: existing && Date.now() - existing.at < SWITCH_RESUME_MS ? existing : null })
   }, [playerSize, placement, volume, loopMode, quality, caption])
 
   const capture = (vid, list) => {
@@ -559,6 +563,13 @@ function YouTubeFloat() {
         await webview.executeJavaScript(driveScript('volume', volume), true)
         await webview.executeJavaScript(driveScript('loop', loopMode), true)
         await webview.executeJavaScript(driveScript('caption', captionRef.current), true)
+        const handoff = resumeRef.current
+        if (handoff && handoff.videoId === videoId) {
+          if (handoff.current > 1) await webview.executeJavaScript(driveScript('seek', handoff.current), true)
+          if (handoff.paused) await webview.executeJavaScript(driveScript('pause'), true)
+          resumeRef.current = null
+          savePrefs({ ...readPrefs(), resume: null })
+        }
         const r = await webview.executeJavaScript(readPlayerScript, true)
         if (r) {
           if (Array.isArray(r.levels) && r.levels.length) setQualities(['auto', ...r.levels])
@@ -879,7 +890,21 @@ function YouTubeFloat() {
   })
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
   const mini = playerSize === 'mini'
-  const togglePlacement = () => { const v = placement === 'docked' ? 'floating' : 'docked'; setPlacement(v); if (setPlayerPlacement) setPlayerPlacement(v) }
+  const togglePlacement = async () => {
+    const v = placement === 'docked' ? 'floating' : 'docked'
+    const snap = videoId ? { at: Date.now(), current: progress.current || 0, paused: progress.paused, playlist, videoId } : null
+    try {
+      const r = await playerRef.current?.executeJavaScript(stateScript, true)
+      if (r && r.ok && (r.videoId || videoId)) {
+        snap.videoId = r.videoId || videoId
+        snap.current = r.current || snap.current
+        snap.paused = r.paused
+      }
+    } catch {}
+    if (snap?.videoId) savePrefs({ ...readPrefs(), placement: v, resume: snap })
+    setPlacement(v)
+    if (setPlayerPlacement) setPlayerPlacement(v)
+  }
   const pinButton = jsx('button', { 'aria-label': placement === 'docked' ? 'Unpin player' : 'Pin player', className: 'grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)', onClick: togglePlacement, title: placement === 'docked' ? 'Pinned: click to float' : 'Floating: click to dock', type: 'button', children: placement === 'docked' ? '📌' : '📍' })
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
@@ -974,7 +999,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.32 ★',
+        title: 'YouTube v3.33 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, {})
       })
