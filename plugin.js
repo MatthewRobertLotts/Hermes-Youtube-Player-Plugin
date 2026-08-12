@@ -1,8 +1,8 @@
-import { cn } from '@hermes/plugin-sdk'
+import { cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.28-media-controls-only'
+const VERSION = 'v3.29-native-hermes-integration'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -15,8 +15,9 @@ const SEARCH_FILTERS = [
 const HISTORY_KEY = 'hermes-yt-history'
 const PREF_KEY = 'hermes-yt-prefs'
 const HISTORY_MAX = 50
-const readPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {} } catch (e) { return {} } }
-const savePrefs = prefs => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
+let pluginStorage = null
+const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
+const savePrefs = prefs => { try { pluginStorage ? pluginStorage.set('prefs', prefs) : localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
 const PLAYER_SIZES = {
   mini: { label: 'Mini', width: '420px', height: '310px', player: '236px' },
   small: { label: 'Small', width: '500px', height: '500px', player: '281px' },
@@ -941,4 +942,53 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.28 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+function YouTubeStatusChip() {
+  return jsx('button', {
+    className: 'inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground',
+    onClick: () => host.navigate('/youtube'),
+    title: 'Open YouTube player',
+    type: 'button',
+    children: '▶ YouTube'
+  })
+}
+
+export default {
+  id: 'youtube-float',
+  name: 'YouTube Float',
+  description: 'Native Hermes YouTube player: docked pane, page, sidebar, palette, status bar, and persistent player preferences.',
+  register(ctx) {
+    pluginStorage = ctx.storage
+    ctx.registerMany([
+      {
+        id: 'player',
+        area: 'panes',
+        title: 'YouTube v3.29 ★',
+        data: { placement: 'right', dock: { pane: 'workspace', pos: 'right' }, width: '420px', minWidth: '360px' },
+        render: () => jsx(YouTubeFloat, {})
+      },
+      {
+        id: 'page',
+        area: 'routes',
+        data: { path: '/youtube' },
+        render: () => jsx(YouTubeFloat, {})
+      },
+      {
+        id: 'nav',
+        area: 'sidebar.nav',
+        order: 70,
+        data: { codicon: 'play', label: 'YouTube', path: '/youtube' }
+      },
+      {
+        id: 'status',
+        area: 'statusBar.right',
+        order: 90,
+        render: () => jsx(YouTubeStatusChip, {})
+      },
+      {
+        id: 'open',
+        area: 'palette',
+        data: { id: 'youtube-float.open', label: 'YouTube: Open player', keywords: ['youtube', 'video', 'music', 'player'], run: () => host.navigate('/youtube') }
+      }
+    ])
+  }
+}

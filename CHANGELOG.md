@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.29
+- Added native Hermes Desktop integration: docked right pane, `/youtube` route, sidebar nav item, status-bar chip, and command-palette opener.
+- Moved preference persistence onto `ctx.storage` with localStorage fallback.
+- Kept OS Media Session controls; no global keyboard interception.
+
 ## v3.28
 - Removed in-app keyboard shortcuts because they intercepted normal Hermes typing.
 - Kept OS/browser Media Session controls only.
