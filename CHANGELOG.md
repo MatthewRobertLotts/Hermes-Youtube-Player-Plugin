@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.21
+
+- **Your Playlists:** broader channel lookup (guide + avatar anchors) with retries while the home page renders.
+- Removed the placeholder default search term.
+
+
 ## v3.20
 
 - **Your Playlists:** new search-mode that resolves the signed-in user's channel, loads its `/playlists` tab in a visible pane, and lists their own playlists — picks open and play them.

@@ -2,8 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.20-your-playlists'
-const DEFAULT_QUERY = 'king boomer'
+const VERSION = 'v3.21-playlists-fix'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -70,13 +69,17 @@ function searchSrc(query, filter) {
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + (sp ? '&sp=' + sp : '')
 }
 const resolveOwnChannelScript = '(' + function () {
-  // Find the signed-in user's own channel href. Prefer the first guide entry link (/channel/UC…),
-  // fall back to the avatar's channel href, then any /@handle or /channel/UC… anchor.
+  // Find the signed-in user's own channel href. Parse candidate channels from many anchors, and
+  // prefer one whose href is a bare /channel/UC… (that's almost always the owner's own channel).
   const hrefs = []
-  try { document.querySelectorAll('a[href*="/channel/UC"], a[href^="/@"]').forEach(a => hrefs.push(a.href || a.getAttribute('href') || '')) } catch (e) {}
-  let href = ''
-  if (hrefs.length) href = hrefs.find(h => /\/channel\/UC[\w-]{20,}/.test(h)) || hrefs[0]
-  return { gaveHref: !!href, href: href.replace(location.origin, '') }
+  try {
+    document.querySelectorAll('a[href*="/channel/"], a[href^="/@"], #avatar-btn, ytd-guide-entry-renderer a, #guide-content a').forEach(a => {
+      const h = (a.href || a.getAttribute('href') || '')
+      if (h && /^\/?(channel\/UC[\w-]{20,}|\@[\w.-]+)/.test(h.split('?')[0])) hrefs.push(h)
+    })
+  } catch (e) {}
+  let href = hrefs.find(h => /\/channel\/UC[\w-]{20,}/.test(h)) || hrefs[0] || ''
+  return { gaveHref: !!href, href: (href || '').replace(location.origin, '').split('?')[0] }
 }.toString() + ')()'
 const probeLoginScript = '(' + function () {
   // The signed-in state shows an avatar button (#avatar-btn) in the masthead; signed-out shows
@@ -380,7 +383,7 @@ const playlistFillScript = '(' + function () {
 }.toString() + ')()'
 
 function YouTubeFloat() {
-  const [draft, setDraft] = useState(DEFAULT_QUERY)
+  const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState('large')
   const [videoId, setVideoId] = useState(null)
@@ -595,16 +598,22 @@ function YouTubeFloat() {
     let cancelled = false
     let phase = 'resolve' // 'resolve' -> 'load' -> done
     let channelHref = ''
+    let resolveTries = 0
     const tick = async () => {
       if (cancelled || !playlistsPaneRef.current) return
       try {
         if (phase === 'resolve') {
           const r = await playlistsPaneRef.current.executeJavaScript(resolveOwnChannelScript, true)
           if (cancelled) return
-          if (!r || !r.gaveHref || !r.href) { phase = 'done'; setStatus('Could not find your channel — open Account and try again.'); setPlaylistsPane(false); return }
+          if (!r || !r.gaveHref || !r.href) {
+            // Home page's guide may still be rendering — retry resolve for a few seconds.
+            resolveTries++
+            if (resolveTries < 8) { window.setTimeout(tick, 1000); return }
+            phase = 'done'; setStatus('Could not find your channel — open Account and try again.'); setPlaylistsPane(false); return
+          }
           channelHref = r.href
           phase = 'load'
-          playlistsPaneRef.current.src = 'https://www.youtube.com' + channelHref + '/playlists?_=' + Date.now()
+          playlistsPaneRef.current.src = 'https://www.youtube.com' + channelHref.replace(/^\//, '/') + '/playlists?_=' + Date.now()
           window.setTimeout(tick, 1800)
           return
         }
@@ -909,4 +918,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.20 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.21 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
