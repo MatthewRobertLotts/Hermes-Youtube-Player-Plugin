@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.23-mini-mode'
+const VERSION = 'v3.24-mini-size-option'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -14,8 +14,8 @@ const SEARCH_FILTERS = [
 ]
 const HISTORY_KEY = 'hermes-yt-history'
 const HISTORY_MAX = 50
-const MINI_SIZE = { width: '360px', height: '260px', player: '203px' }
 const PLAYER_SIZES = {
+  mini: { label: 'Mini', width: '420px', height: '310px', player: '236px' },
   small: { label: 'Small', width: '500px', height: '500px', player: '281px' },
   medium: { label: 'Medium', width: '640px', height: '610px', player: '360px' },
   large: { label: 'Large', width: '760px', height: '720px', player: '427px' }
@@ -397,7 +397,6 @@ function YouTubeFloat() {
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState('large')
-  const [mini, setMini] = useState(false)
   const [videoId, setVideoId] = useState(null)
   const [playlist, setPlaylist] = useState(null)
   const [queueMode, setQueueMode] = useState('search')
@@ -495,13 +494,13 @@ function YouTubeFloat() {
   }
 
   useEffect(() => {
-    const cfg = mini ? MINI_SIZE : (PLAYER_SIZES[playerSize] || PLAYER_SIZES.large)
+    const cfg = PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
     const pane = rootRef.current?.closest?.('[data-floating-pane]')
     if (!pane) return
     pane.style.width = cfg.width
     pane.style.height = cfg.height
     window.dispatchEvent(new Event('resize'))
-  }, [playerSize, mini])
+  }, [playerSize])
 
   const capture = (vid, list) => {
     setVideoId(vid)
@@ -850,7 +849,8 @@ function YouTubeFloat() {
     value: '__title',
     children: [jsx('option', { value: '__title', children: label }, '__title'), ...children]
   })
-  const cfg = () => mini ? MINI_SIZE : (PLAYER_SIZES[playerSize] || PLAYER_SIZES.large)
+  const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
+  const mini = playerSize === 'mini'
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, children: [
     jsx('div', {
@@ -884,8 +884,7 @@ function YouTubeFloat() {
             jsx('input', { 'aria-label': 'Volume', className: 'h-16 w-1 cursor-pointer accent-(--ui-accent)', max: 1, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setVolume(v); void runCommand('volume', v) }, orient: 'vertical', step: 0.05, type: 'range', value: volume }),
             jsx('span', { className: 'text-[10px] tabular-nums text-(--ui-text-tertiary)', children: Math.round(volume * 100) + '%' })
           ] }) : null
-        ] }),
-        jsx('button', { className: 'h-6 rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: () => { setMini(m => !m); setVolumeOpen(false) }, title: mini ? 'Restore full player' : 'Mini mode', type: 'button', children: mini ? 'Full' : 'Mini' })
+        ] })
       ] }),
       mini ? null : jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
@@ -916,4 +915,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.23 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.24 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

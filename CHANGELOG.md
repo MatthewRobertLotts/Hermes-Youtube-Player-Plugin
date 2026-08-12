@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.24
+- Moved Mini into the existing Size dropdown; removed the separate Mini/Full button.
+- Made Mini less tiny: 420×310 with a 236px player so the control row fits.
+
 ## v3.23
 - Added **Mini** mode: shrinks the floating pane to video, timeline, volume, and a Full button.
 - Cleaned account-feed loading text and removed the dead playlist channel resolver from the failed v3.21 approach.
