@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.36
+- Moved close out of the player controls and into the Hermes tab strip as a close glyph.
+- Blocked the dangerous right-click tab menu for the player tab so Close no longer disables the whole plugin.
+- Status-bar chip and command-palette action now toggle the player open/closed.
+- Kept live player state in module memory so layout remounts can resume the current video.
+
 ## v3.35
 - Made the docked player behave like a closeable Hermes tab so its top bar stays available by default.
 - Added an in-player close button for docked/floating pane instances.
