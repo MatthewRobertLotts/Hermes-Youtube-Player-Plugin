@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.3
+
+- Made the **timeline** the dominant slider bar — fills the row, thicker thumb, volume stays compact on the right.
+
+
 ## v3.2
 
 - Added **Volume** slider on the timeline row — sets YouTube player + video-element volume.

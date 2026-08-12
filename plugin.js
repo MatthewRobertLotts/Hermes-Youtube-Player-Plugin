@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.2-volume'
+const VERSION = 'v3.3-timeline'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -29,10 +29,10 @@ const fmt = seconds => {
 // Module-scope so it keeps a stable type: re-renders only touch THIS subtree, never the
 // dropdown controls (native select popups get killed by unrelated DOM churn in Electron).
 function Timeline({ current, duration, onSeek, videoId }) {
-  return jsxs('div', { className: 'mb-1 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
-    jsx('span', { children: fmt(current) }),
-    jsx('input', { className: 'h-1 flex-1 accent-(--ui-accent)', disabled: !videoId, max: duration || 0, min: 0, onChange: e => onSeek(Number(e.currentTarget.value)), onPointerUp: e => e.currentTarget.blur(), type: 'range', value: Math.min(current, duration || current) }),
-    jsx('span', { children: fmt(duration) })
+  return jsxs('div', { className: 'mb-1 flex min-w-0 flex-1 items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
+    jsx('span', { className: 'shrink-0 tabular-nums', children: fmt(current) }),
+    jsx('input', { className: 'h-2 min-w-0 flex-1 accent-(--ui-accent)', disabled: !videoId, max: duration || 0, min: 0, onChange: e => onSeek(Number(e.currentTarget.value)), onPointerUp: e => e.currentTarget.blur(), type: 'range', value: Math.min(current, duration || current) }),
+    jsx('span', { className: 'shrink-0 tabular-nums', children: fmt(duration) })
   ] })
 }
 
@@ -679,4 +679,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.2 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.3 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
