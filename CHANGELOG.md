@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.12
+
+- **History fixed via YouTube browse API**: history items load through YouTube's own `/youtubei/v1/browse` endpoint (same origin, logged in) instead of the empty initial-page shell — the data that DevTools showed arriving in a separate AJAX call is now read directly.
+
+
 ## v3.11
 
 - Feed diagnostics now include the **URL** the webview landed on — to distinguish consent walls / redirects / home from a real empty feed.
