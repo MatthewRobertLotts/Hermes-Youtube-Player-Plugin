@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.10-feedpagediag'
+const VERSION = 'v3.11-feedurl'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -678,7 +678,7 @@ function YouTubeFloat() {
         if (clean[0]) setStatus('Choose a result')
         else if (searchUrl && /feed\//.test(searchUrl)) {
           const rk = (res && res.renderers) ? Object.entries(res.renderers).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => k + '×' + n).join(', ') : 'none'
-          const pg = res && res.page ? ' | page: ' + (res.page.title || '?').slice(0, 40) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''
+          const pg = res && res.page ? ' | page: ' + (res.page.title || '?').slice(0, 40) + ' url=' + (res.page.url || '?').slice(0, 60) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''
           setStatus('Feed empty (renderers: ' + rk + pg + ')')
         } else setStatus('No videos found')
       } catch (error) { if (!cancelled) setStatus(error instanceof Error ? error.message : String(error)) }
@@ -791,4 +791,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.10 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.11 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

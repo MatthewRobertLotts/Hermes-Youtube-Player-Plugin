@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.11
+
+- Feed diagnostics now include the **URL** the webview landed on — to distinguish consent walls / redirects / home from a real empty feed.
+
+
 ## v3.10
 
 - Deeper feed diagnostics: empty signed-in feeds now report the page title, whether `ytInitialData` exists, and body size — to pinpoint consent/sign-in walls vs genuinely empty pages.
