@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.25-mini-size-escape'
+const VERSION = 'v3.26-keyboard-media-controls'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -237,6 +237,8 @@ function driveScript(action, value) {
     }
     if (p && typeof p.getCurrentTime === 'function') {
       if (payload.action === 'playPause') { pausedOf() ? p.playVideo() : p.pauseVideo() }
+      else if (payload.action === 'play') p.playVideo()
+      else if (payload.action === 'pause') p.pauseVideo()
       else if (payload.action === 'seek') p.seekTo(Number(payload.value), true)
       else if (payload.action === 'rewind') p.seekTo(p.getCurrentTime() - 10, true)
       else if (payload.action === 'forward') p.seekTo(p.getCurrentTime() + 10, true)
@@ -274,6 +276,8 @@ function driveScript(action, value) {
     }
     if (v) {
       if (payload.action === 'playPause') v.paused ? v.play() : v.pause()
+      else if (payload.action === 'play') v.play()
+      else if (payload.action === 'pause') v.pause()
       else if (payload.action === 'seek') v.currentTime = Math.max(0, Math.min(v.duration || payload.value, Number(payload.value) || 0))
       else if (payload.action === 'rewind') v.currentTime = Math.max(0, v.currentTime - 10)
       else if (payload.action === 'forward') v.currentTime = Math.min(v.duration || v.currentTime + 10, v.currentTime + 10)
@@ -834,6 +838,33 @@ function YouTubeFloat() {
     setQueueMode(entry || item ? 'playlist' : 'search')
   }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
+  useEffect(() => {
+    const volumeTo = v => { const next = Math.max(0, Math.min(1, v)); setVolume(next); void runCommand('volume', next) }
+    const keydown = e => {
+      const tag = String(e.target?.tagName || '').toLowerCase()
+      if (loginPane || historyPane || playlistsPane || /input|textarea|select/.test(tag)) return
+      const map = { ' ': 'playPause', k: 'playPause', ArrowLeft: 'rewind', j: 'rewind', ArrowRight: 'forward', l: 'forward' }
+      const action = map[e.key]
+      if (action) { e.preventDefault(); void runCommand(action); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); volumeTo(volume + 0.05) }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); volumeTo(volume - 0.05) }
+      else if (e.key.toLowerCase() === 'm') { e.preventDefault(); volumeTo(volume ? 0 : 1) }
+    }
+    window.addEventListener('keydown', keydown)
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = progress.paused ? 'paused' : 'playing'
+      navigator.mediaSession.setActionHandler('play', () => void runCommand('play'))
+      navigator.mediaSession.setActionHandler('pause', () => void runCommand('pause'))
+      navigator.mediaSession.setActionHandler('previoustrack', () => playOffset(-1))
+      navigator.mediaSession.setActionHandler('nexttrack', () => playOffset(1))
+      navigator.mediaSession.setActionHandler('seekbackward', () => void runCommand('rewind'))
+      navigator.mediaSession.setActionHandler('seekforward', () => void runCommand('forward'))
+    }
+    return () => {
+      window.removeEventListener('keydown', keydown)
+      if ('mediaSession' in navigator) ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach(a => navigator.mediaSession.setActionHandler(a, null))
+    }
+  }, [volume, progress.paused, loginPane, historyPane, playlistsPane, results, currentIndex])
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   // Static-title select: value pinned to a disabled-capable placeholder option carrying the label,
   // so the button always shows e.g. "Subs". On focus we sync the DOM value to the real selection so
@@ -852,7 +883,7 @@ function YouTubeFloat() {
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
   const mini = playerSize === 'mini'
 
-  return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, children: [
+  return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
     jsx('div', {
       className: 'relative shrink-0 bg-black',
       style: { height: cfg().player },
@@ -916,4 +947,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.25 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.26 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.26
+- Added keyboard shortcuts: Space/K play-pause, J/Left rewind, L/Right forward, Up/Down volume, M mute.
+- Added Media Session handlers for OS/media-key play, pause, previous, next, rewind, and forward.
+
 ## v3.25
 - Mini mode now keeps the Size dropdown visible on the left of the timeline, so you can leave Mini without reinstalling.
 
