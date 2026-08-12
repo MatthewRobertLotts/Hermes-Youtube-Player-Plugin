@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.35
+- Made the docked player behave like a closeable Hermes tab so its top bar stays available by default.
+- Added an in-player close button for docked/floating pane instances.
+- Status bar and command palette reopen the player pane after closing.
+
 ## v3.34
 - Made pin/unpin immediate by removing the blocking webview JavaScript round-trip from the click handler.
 - Resume now uses the last known React progress snapshot and YouTube's `t=` URL start time.

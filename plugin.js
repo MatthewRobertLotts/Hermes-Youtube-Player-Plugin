@@ -2,7 +2,7 @@ import { cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.34-fast-placement-switch'
+const VERSION = 'v3.35-pane-chrome-close'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -18,6 +18,8 @@ const HISTORY_MAX = 50
 const SWITCH_RESUME_MS = 120000
 let pluginStorage = null
 let setPlayerPlacement = null
+let setPlayerOpen = null
+let closePlayerPane = null
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
 const savePrefs = prefs => { try { pluginStorage ? pluginStorage.set('prefs', prefs) : localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
 const PLAYER_SIZES = {
@@ -404,7 +406,7 @@ const playlistFillScript = '(' + function () {
   return out
 }.toString() + ')()'
 
-function YouTubeFloat() {
+function YouTubeFloat({ pane = false } = {}) {
   const prefs = useMemo(readPrefs, [])
   const resume = prefs.resume && Date.now() - prefs.resume.at < SWITCH_RESUME_MS ? prefs.resume : null
   const [draft, setDraft] = useState('')
@@ -519,8 +521,9 @@ function YouTubeFloat() {
   }, [playerSize])
 
   useEffect(() => {
-    const existing = readPrefs().resume
-    savePrefs({ playerSize, placement, volume, loopMode, quality, caption, resume: existing && Date.now() - existing.at < SWITCH_RESUME_MS ? existing : null })
+    const currentPrefs = readPrefs()
+    const existing = currentPrefs.resume
+    savePrefs({ playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption, resume: existing && Date.now() - existing.at < SWITCH_RESUME_MS ? existing : null })
   }, [playerSize, placement, volume, loopMode, quality, caption])
 
   const capture = (vid, list) => {
@@ -899,6 +902,7 @@ function YouTubeFloat() {
     if (setPlayerPlacement) setPlayerPlacement(v)
   }
   const pinButton = jsx('button', { 'aria-label': placement === 'docked' ? 'Unpin player' : 'Pin player', className: 'grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)', onClick: togglePlacement, title: placement === 'docked' ? 'Pinned: click to float' : 'Floating: click to dock', type: 'button', children: placement === 'docked' ? '📌' : '📍' })
+  const closeButton = pane ? jsx('button', { 'aria-label': 'Close player', className: 'grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:border-red-400 hover:text-red-300', onClick: () => { if (closePlayerPane) closePlayerPane() }, title: 'Close player', type: 'button', children: '×' }) : null
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
     jsx('div', {
@@ -934,7 +938,8 @@ function YouTubeFloat() {
             jsx('input', { 'aria-label': 'Volume', className: 'h-16 w-1 cursor-pointer accent-(--ui-accent)', max: 1, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setVolume(v); void runCommand('volume', v) }, orient: 'vertical', step: 0.05, type: 'range', value: volume }),
             jsx('span', { className: 'text-[10px] tabular-nums text-(--ui-text-tertiary)', children: Math.round(volume * 100) + '%' })
           ] }) : null
-        ] })
+        ] }),
+        closeButton
       ] }),
       mini ? null : jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
@@ -968,7 +973,7 @@ function YouTubeFloat() {
 function YouTubeStatusChip() {
   return jsx('button', {
     className: 'inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground',
-    onClick: () => host.navigate('/youtube'),
+    onClick: () => { if (setPlayerOpen) setPlayerOpen(true) },
     title: 'Open YouTube player',
     type: 'button',
     children: '▶ YouTube'
@@ -984,7 +989,8 @@ export default {
     let disposePlayer = null
     const playerData = placement => placement === 'floating'
       ? { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }
-      : { placement: 'right', dock: { pane: 'workspace', pos: 'right' }, width: '420px', minWidth: '360px' }
+      // ponytail: placement main forces a visible tab/header; dock still lands it right of workspace.
+      : { placement: 'main', dock: { pane: 'workspace', pos: 'right' }, width: '420px', minWidth: '360px' }
     const playerId = placement => placement === 'floating' ? 'player-floating' : 'player-docked'
     const registerPlayer = placement => {
       if (disposePlayer) disposePlayer()
@@ -992,17 +998,27 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.34 ★',
+        title: 'YouTube v3.35 ★',
         data: playerData(placement),
-        render: () => jsx(YouTubeFloat, {})
+        render: () => jsx(YouTubeFloat, { pane: true })
       })
     }
+    setPlayerOpen = open => {
+      savePrefs({ ...readPrefs(), playerOpen: open !== false })
+      if (open === false) {
+        if (disposePlayer) disposePlayer()
+        disposePlayer = null
+        return
+      }
+      registerPlayer(readPrefs().placement === 'floating' ? 'floating' : 'docked')
+    }
+    closePlayerPane = () => setPlayerOpen(false)
     setPlayerPlacement = placement => {
       const clean = placement === 'floating' ? 'floating' : 'docked'
-      savePrefs({ ...readPrefs(), placement: clean })
+      savePrefs({ ...readPrefs(), placement: clean, playerOpen: true })
       registerPlayer(clean)
     }
-    registerPlayer(readPrefs().placement === 'floating' ? 'floating' : 'docked')
+    if (readPrefs().playerOpen !== false) registerPlayer(readPrefs().placement === 'floating' ? 'floating' : 'docked')
     ctx.registerMany([
       {
         id: 'page',
@@ -1025,7 +1041,7 @@ export default {
       {
         id: 'open',
         area: 'palette',
-        data: { id: 'youtube-float.open', label: 'YouTube: Open player', keywords: ['youtube', 'video', 'music', 'player'], run: () => host.navigate('/youtube') }
+        data: { id: 'youtube-float.open', label: 'YouTube: Open player', keywords: ['youtube', 'video', 'music', 'player'], run: () => { if (setPlayerOpen) setPlayerOpen(true) } }
       }
     ])
   }
