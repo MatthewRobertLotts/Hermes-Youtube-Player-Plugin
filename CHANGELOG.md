@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.25
+- Mini mode now keeps the Size dropdown visible on the left of the timeline, so you can leave Mini without reinstalling.
+
 ## v3.24
 - Moved Mini into the existing Size dropdown; removed the separate Mini/Full button.
 - Made Mini less tiny: 420×310 with a 236px player so the control row fits.
