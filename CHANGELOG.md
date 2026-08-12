@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.30
+- Added a `Place` dropdown: switch the single player pane between Docked and Floating.
+- The plugin unregisters/re-registers the one pane instead of keeping two player instances.
+- Placement is persisted with the other safe preferences.
+
 ## v3.29
 - Added native Hermes Desktop integration: docked right pane, `/youtube` route, sidebar nav item, status-bar chip, and command-palette opener.
 - Moved preference persistence onto `ctx.storage` with localStorage fallback.

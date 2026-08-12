@@ -2,7 +2,7 @@ import { cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.29-native-hermes-integration'
+const VERSION = 'v3.30-switchable-placement'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -16,6 +16,7 @@ const HISTORY_KEY = 'hermes-yt-history'
 const PREF_KEY = 'hermes-yt-prefs'
 const HISTORY_MAX = 50
 let pluginStorage = null
+let setPlayerPlacement = null
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
 const savePrefs = prefs => { try { pluginStorage ? pluginStorage.set('prefs', prefs) : localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
 const PLAYER_SIZES = {
@@ -406,6 +407,7 @@ function YouTubeFloat() {
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState(PLAYER_SIZES[prefs.playerSize] ? prefs.playerSize : 'large')
+  const [placement, setPlacement] = useState(prefs.placement === 'floating' ? 'floating' : 'docked')
   const [videoId, setVideoId] = useState(null)
   const [playlist, setPlaylist] = useState(null)
   const [queueMode, setQueueMode] = useState('search')
@@ -512,8 +514,8 @@ function YouTubeFloat() {
   }, [playerSize])
 
   useEffect(() => {
-    savePrefs({ playerSize, volume, loopMode, quality, caption })
-  }, [playerSize, volume, loopMode, quality, caption])
+    savePrefs({ playerSize, placement, volume, loopMode, quality, caption })
+  }, [playerSize, placement, volume, loopMode, quality, caption])
 
   const capture = (vid, list) => {
     setVideoId(vid)
@@ -915,6 +917,7 @@ function YouTubeFloat() {
       ] }),
       mini ? null : jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
+                        jsx(StaticSelect, { current: placement, label: 'Place', onChange: e => { const v = e.currentTarget.value; setPlacement(v); if (setPlayerPlacement) setPlayerPlacement(v) }, title: 'Docked or floating player', width: 74, children: [jsx('option', { value: 'docked', children: 'Docked' }, 'docked'), jsx('option', { value: 'floating', children: 'Floating' }, 'floating')] }),
                         jsx(StaticSelect, { current: playerSize, label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
                         jsx(StaticSelect, { current: quality, label: 'Quality', onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, title: 'Video quality', width: 80, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) })
                       ] }),
@@ -955,17 +958,30 @@ function YouTubeStatusChip() {
 export default {
   id: 'youtube-float',
   name: 'YouTube Float',
-  description: 'Native Hermes YouTube player: docked pane, page, sidebar, palette, status bar, and persistent player preferences.',
+  description: 'Native Hermes YouTube player: switchable docked/floating pane, page, sidebar, palette, status bar, and persistent player preferences.',
   register(ctx) {
     pluginStorage = ctx.storage
-    ctx.registerMany([
-      {
+    let disposePlayer = null
+    const playerData = placement => placement === 'floating'
+      ? { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }
+      : { placement: 'right', dock: { pane: 'workspace', pos: 'right' }, width: '420px', minWidth: '360px' }
+    const registerPlayer = placement => {
+      if (disposePlayer) disposePlayer()
+      disposePlayer = ctx.register({
         id: 'player',
         area: 'panes',
-        title: 'YouTube v3.29 ★',
-        data: { placement: 'right', dock: { pane: 'workspace', pos: 'right' }, width: '420px', minWidth: '360px' },
+        title: 'YouTube v3.30 ★',
+        data: playerData(placement),
         render: () => jsx(YouTubeFloat, {})
-      },
+      })
+    }
+    setPlayerPlacement = placement => {
+      const clean = placement === 'floating' ? 'floating' : 'docked'
+      savePrefs({ ...readPrefs(), placement: clean })
+      registerPlayer(clean)
+    }
+    registerPlayer(readPrefs().placement === 'floating' ? 'floating' : 'docked')
+    ctx.registerMany([
       {
         id: 'page',
         area: 'routes',
