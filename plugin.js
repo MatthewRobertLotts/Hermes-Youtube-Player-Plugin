@@ -2,7 +2,7 @@ import { cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.31-single-active-placement'
+const VERSION = 'v3.32-pin-placement-toggle'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -879,6 +879,8 @@ function YouTubeFloat() {
   })
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
   const mini = playerSize === 'mini'
+  const togglePlacement = () => { const v = placement === 'docked' ? 'floating' : 'docked'; setPlacement(v); if (setPlayerPlacement) setPlayerPlacement(v) }
+  const pinButton = jsx('button', { 'aria-label': placement === 'docked' ? 'Unpin player' : 'Pin player', className: 'grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)', onClick: togglePlacement, title: placement === 'docked' ? 'Pinned: click to float' : 'Floating: click to dock', type: 'button', children: placement === 'docked' ? '📌' : '📍' })
 
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
     jsx('div', {
@@ -906,6 +908,7 @@ function YouTubeFloat() {
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsxs('div', { className: 'mb-1 flex items-center gap-2', children: [
         mini ? jsx(StaticSelect, { current: playerSize, label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }) : null,
+        pinButton,
         jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
         jsxs('div', { className: 'relative shrink-0', children: [
           jsx('button', { 'aria-label': 'Volume', className: 'grid h-6 w-6 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', disabled: !videoId, onClick: () => setVolumeOpen(o => !o), title: 'Volume', type: 'button', children: volume === 0 ? '🔇' : (volume < 0.5 ? '🔈' : '🔊') }),
@@ -917,7 +920,6 @@ function YouTubeFloat() {
       ] }),
       mini ? null : jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
-                        jsx(StaticSelect, { current: placement, label: 'Place', onChange: e => { const v = e.currentTarget.value; setPlacement(v); if (setPlayerPlacement) setPlayerPlacement(v) }, title: 'Docked or floating player', width: 74, children: [jsx('option', { value: 'docked', children: 'Docked' }, 'docked'), jsx('option', { value: 'floating', children: 'Floating' }, 'floating')] }),
                         jsx(StaticSelect, { current: playerSize, label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
                         jsx(StaticSelect, { current: quality, label: 'Quality', onChange: e => { setQuality(e.currentTarget.value); void runCommand('quality', e.currentTarget.value) }, title: 'Video quality', width: 80, children: qualities.map(q => jsx('option', { value: q, children: QUALITY_LABELS[q] || q }, q)) })
                       ] }),
@@ -972,7 +974,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.31 ★',
+        title: 'YouTube v3.32 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, {})
       })

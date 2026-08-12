@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.32
+- Replaced the Place dropdown with a pin/unpin icon button.
+- Moved placement toggle to the left of the timeline, mirroring the volume button on the right.
+- Kept the v3.31 duplicate-pane fix: separate internal docked/floating pane ids, one active at a time.
+
 ## v3.31
 - Fixed Docked → Floating switch leaving both panes visible.
 - Uses separate internal pane ids for docked and floating while only registering the active one.
