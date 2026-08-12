@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.23
+- Added **Mini** mode: shrinks the floating pane to video, timeline, volume, and a Full button.
+- Cleaned account-feed loading text and removed the dead playlist channel resolver from the failed v3.21 approach.
+- Window-size persistence intentionally left out for the separate pass.
+
 ## v3.22
 - **Subscriptions/Watch Later auto-load:** fixed account feed cache-busting URLs so dropdown selection uses valid `?`/`&` URLs; no manual blank search should be needed.
 - **Your Playlists:** now loads YouTube's signed-in `You` page directly and scrapes rendered playlist tiles, avoiding fragile channel URL resolution.
