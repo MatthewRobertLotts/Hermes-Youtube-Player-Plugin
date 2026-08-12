@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.4-volume-popover'
+const VERSION = 'v3.5-sign-in'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -358,6 +358,9 @@ function YouTubeFloat() {
   const [progress, setProgress] = useState({ current: 0, duration: 0, paused: true })
   const [volume, setVolume] = useState(1)
   const [volumeOpen, setVolumeOpen] = useState(false)
+  const [loginPane, setLoginPane] = useState(false)
+  const loginPaneRef = useRef(loginPane)
+  loginPaneRef.current = loginPane
   const [streams, setStreams] = useState([])
   const [native, setNative] = useState(false)
   const searchRef = useRef(null)
@@ -428,6 +431,7 @@ function YouTubeFloat() {
       return false
     }
     const ready = async () => {
+      if (loginPaneRef.current) return
       try {
         await webview.executeJavaScript(stripScript, true)
         await webview.executeJavaScript(driveScript('caption', captionRef.current), true)
@@ -480,7 +484,7 @@ function YouTubeFloat() {
   const autostartReloadedRef = useRef(false)
   const autostartArmedAtRef = useRef(0)
   useEffect(() => {
-    if (!videoId) return undefined
+    if (!videoId || loginPaneRef.current) return undefined
     const timer = window.setInterval(async () => {
       // While a dropdown/select popup is open, unrelated DOM churn kills it; while the user drags
       // the timeline, re-rendering fights the drag. So skip progress re-renders during
@@ -640,9 +644,11 @@ function YouTubeFloat() {
     jsx('div', {
       className: 'relative shrink-0 bg-black',
       style: { height: cfg().player },
-      children: videoId
-        ? jsx('webview', { key: videoId, className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
-        : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })
+      children: loginPane
+        ? jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com' })
+        : (videoId
+          ? jsx('webview', { key: videoId, className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
+          : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
@@ -678,10 +684,11 @@ function YouTubeFloat() {
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => { const v = e.currentTarget.value; setFilter(v); if (v === 'history') showHistory() }, value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
-      jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' })
+      jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' }),
+      jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: () => { setLoginPane(p => !p); setVolumeOpen(false) }, title: loginPane ? 'Done — back to the locked player' : 'Sign in to your YouTube account', type: 'button', children: loginPane ? '✓ Done' : 'Account' })
     ] }),
     results.length ? jsx('div', { className: 'max-h-[30vh] min-h-0 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', (progress.videoId && result.id === progress.videoId) ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), result.type === 'playlist' ? jsx('span', { className: 'shrink-0 rounded bg-(--ui-accent)/20 px-1 py-0.5 text-[9px] font-medium text-(--ui-accent)', children: '▶ Playlist' }) : null, jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, (progress.videoId && result.id === progress.videoId) ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'min-h-0 flex-1 border-t border-white/10 px-2 py-2 text-[11px] text-(--ui-text-quaternary)', children: status === 'Searching YouTube…' ? 'Searching… results will appear here.' : status })
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.4 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.5 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.5
+
+- Added **Account / Sign in** — a button that temporarily makes the player area an interactive YouTube sign-in pane (session persists for playback), then **Done** returns to the locked media-player view.
+
+
 ## v3.4
 
 - Volume is now a compact speaker-button popover — click the 🔊 icon to reveal a vertical volume slider; the timeline keeps the whole row.
