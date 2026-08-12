@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.4
+
+- Volume is now a compact speaker-button popover — click the 🔊 icon to reveal a vertical volume slider; the timeline keeps the whole row.
+
+
 ## v3.3
 
 - Made the **timeline** the dominant slider bar — fills the row, thicker thumb, volume stays compact on the right.

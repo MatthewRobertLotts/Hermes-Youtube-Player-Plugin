@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.3-timeline'
+const VERSION = 'v3.4-volume-popover'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -357,6 +357,7 @@ function YouTubeFloat() {
   const [captions, setCaptions] = useState([])
   const [progress, setProgress] = useState({ current: 0, duration: 0, paused: true })
   const [volume, setVolume] = useState(1)
+  const [volumeOpen, setVolumeOpen] = useState(false)
   const [streams, setStreams] = useState([])
   const [native, setNative] = useState(false)
   const searchRef = useRef(null)
@@ -395,6 +396,7 @@ function YouTubeFloat() {
   const capture = (vid, list) => {
     setVideoId(vid)
     setPlaylist(list || null)
+    setVolumeOpen(false)
     setNative(false)
     nativeRef.current = false
     setStreams([])
@@ -646,9 +648,12 @@ function YouTubeFloat() {
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsxs('div', { className: 'mb-1 flex items-center gap-2', children: [
         jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
-        jsxs('label', { className: 'flex shrink-0 items-center gap-1 text-[11px] text-(--ui-text-tertiary)', title: 'Volume', children: [
-          jsx('span', { children: '🔊' }),
-          jsx('input', { 'aria-label': 'Volume', className: 'h-1 w-16 cursor-pointer accent-(--ui-accent)', disabled: !videoId, max: 1, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setVolume(v); void runCommand('volume', v) }, step: 0.05, type: 'range', value: volume })
+        jsxs('div', { className: 'relative shrink-0', children: [
+          jsx('button', { 'aria-label': 'Volume', className: 'grid h-6 w-6 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', disabled: !videoId, onClick: () => setVolumeOpen(o => !o), title: 'Volume', type: 'button', children: volume === 0 ? '🔇' : (volume < 0.5 ? '🔈' : '🔊') }),
+          volumeOpen ? jsxs('div', { className: 'absolute bottom-7 right-0 z-10 flex flex-col items-center gap-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) p-2 shadow-lg', children: [
+            jsx('input', { 'aria-label': 'Volume', className: 'h-16 w-1 cursor-pointer accent-(--ui-accent)', max: 1, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setVolume(v); void runCommand('volume', v) }, orient: 'vertical', step: 0.05, type: 'range', value: volume }),
+            jsx('span', { className: 'text-[10px] tabular-nums text-(--ui-text-tertiary)', children: Math.round(volume * 100) + '%' })
+          ] }) : null
         ] })
       ] }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
@@ -679,4 +684,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.3 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.4 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
