@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.37
+- Added an `×` close button to the floating player header.
+- Keeps the docked player close glyph in the Hermes tab strip.
+- Both close paths route through the plugin's safe close/reopen state instead of disabling the plugin.
+
 ## v3.36
 - Moved close out of the player controls and into the Hermes tab strip as a close glyph.
 - Blocked the dangerous right-click tab menu for the player tab so Close no longer disables the whole plugin.

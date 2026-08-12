@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.36-tab-close-state-keepalive'
+const VERSION = 'v3.37-floating-header-close'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -528,6 +528,27 @@ function YouTubeFloat({ pane = false } = {}) {
     savePrefs({ playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption, resume: existing && Date.now() - existing.at < SWITCH_RESUME_MS ? existing : null })
   }, [playerSize, placement, volume, loopMode, quality, caption])
 
+  useEffect(() => {
+    if (!pane || placement !== 'floating') return undefined
+    let button = null
+    const mount = () => {
+      const header = document.querySelector('[data-floating-pane="player-floating"] header')
+      if (!header || header.querySelector('[data-youtube-float-close]')) return
+      button = document.createElement('button')
+      button.dataset.youtubeFloatClose = '1'
+      button.setAttribute('data-floating-no-drag', '')
+      button.type = 'button'
+      button.title = 'Close YouTube player'
+      button.textContent = '×'
+      button.className = 'rounded px-1 text-xs text-(--ui-text-quaternary) transition-colors hover:text-(--ui-text-primary)'
+      button.onclick = event => { event.preventDefault(); event.stopPropagation(); if (closePlayerPane) closePlayerPane() }
+      header.appendChild(button)
+    }
+    const timer = window.setTimeout(mount, 0)
+    mount()
+    return () => { window.clearTimeout(timer); if (button && button.parentNode) button.parentNode.removeChild(button) }
+  }, [pane, placement])
+
   const capture = (vid, list) => {
     setVideoId(vid)
     setPlaylist(list || null)
@@ -1001,7 +1022,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.36 ★',
+        title: 'YouTube v3.37 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
