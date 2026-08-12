@@ -2,13 +2,16 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v68-MILESTONE-autostart'
+const VERSION = 'v3.1-history'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
-  ['playlists', 'Playlists']
+  ['playlists', 'Playlists'],
+  ['history', 'History']
 ]
+const HISTORY_KEY = 'hermes-yt-history'
+const HISTORY_MAX = 50
 const PLAYER_SIZES = {
   small: { label: 'Small', width: '500px', height: '500px', player: '281px' },
   medium: { label: 'Medium', width: '640px', height: '610px', player: '360px' },
@@ -354,6 +357,25 @@ function YouTubeFloat() {
   const playerRef = useRef(null)
   const rootRef = useRef(null)
   const nativeRef = useRef(false)
+  const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
+  const historyRef = useRef(history)
+  historyRef.current = history
+  const remember = (result, index) => {
+    if (!result || !result.id) return
+    if (result.type === 'playlist' && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(result.id)) return
+    const entry = { id: result.id, title: result.title, thumb: result.thumb || '', duration: result.duration || '', type: result.type || 'video', at: Date.now() }
+    const next = [entry, ...historyRef.current.filter(h => h.id !== entry.id)].slice(0, HISTORY_MAX)
+    historyRef.current = next
+    setHistory(next)
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch (e) {}
+  }
+  const showHistory = () => {
+    setQueueMode('search')
+    setSearchUrl(null)
+    setResults(historyRef.current)
+    setCurrentIndex(-1)
+    setStatus(historyRef.current.length ? 'History — pick a result' : 'No history yet')
+  }
 
   useEffect(() => {
     const cfg = PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
@@ -499,6 +521,7 @@ function YouTubeFloat() {
           next = list[indexRef.current + 1]
         }
         if (next) {
+          remember(next, indexRef.current + 1)
           capture(next.id, qm === 'playlist' ? pl : next.list)
           const idx = list.indexOf(next)
           if (idx !== -1) setCurrentIndex(idx)
@@ -559,6 +582,7 @@ function YouTubeFloat() {
 
   const submit = event => {
     event.preventDefault()
+    if (filter === 'history') { showHistory(); return }
     const next = draft.trim()
     if (!next) return
     const exact = videoIdFrom(next)
@@ -569,6 +593,8 @@ function YouTubeFloat() {
     setSearchUrl(searchSrc(next, filter) + '&_=' + Date.now())
   }
   const play = (result, index) => {
+    // Remember anything a user actually plays (skip bare playlist entry rows).
+    remember(result, index)
     // "Playlist" rows come in two shapes: a playlist-id (PL...) as the row id, or a first-video id
     // with a list= param. Both are playlist ENTRIES; only bare video-id rows inside an opened
     // playlist are individual ITEMS.
@@ -633,7 +659,7 @@ function YouTubeFloat() {
     ] }),
     /(^Playlist|^Auto:|^End of list)/.test(status) ? jsx('div', { className: 'shrink-0 border-t border-white/10 px-3 py-1 text-[10px] text-(--ui-text-quaternary)', children: status }) : null,
     jsxs('form', { className: 'flex shrink-0 gap-1.5 border-t border-white/10 bg-(--ui-bg-elevated)/95 p-2', onSubmit: submit, children: [
-      jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => setFilter(e.currentTarget.value), value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
+      jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => { const v = e.currentTarget.value; setFilter(v); if (v === 'history') showHistory() }, value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
       jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' })
     ] }),
@@ -641,4 +667,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v68 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.1 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

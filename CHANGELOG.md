@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.1
+
+- Added **History** search mode — watched items recorded newest-first, persisted in localStorage (last 50), replayable from the dropdown.
+
+
 ## v0.1
 
 - Initial floating YouTube pane package.

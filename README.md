@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
-  <img src="https://img.shields.io/badge/Current-v3.0%E2%98%85-22498e" alt="Current v3.0">
+  <img src="https://img.shields.io/badge/Current-v3.1-blue" alt="Current v3.1">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
 </p>
 
@@ -58,6 +58,9 @@ Three-mode loop with a proper `ended` listener: play once and stop, or loop the 
 ### 📺 Search modes: Videos, Shorts, Playlists
 Pick a mode, type, and search. Results come straight from YouTube's own data — accurate thumbnails, durations, badges and playlist counts.
 
+### 🕘 Watch history
+A **History** mode in the same dropdown shows everything you've played, newest first, persisted across restarts (your last 50 items). Click any row to replay it.
+
 ### ⏩ Shorts chaining
 Open a Short and the next one plays automatically. **Drift detection** reads the live player's video id and snaps you back if YouTube auto-switches to something you didn't ask for; pausing never advances.
 
@@ -100,10 +103,10 @@ Playlists — search, open a playlist, and chain through every episode:
 2. From a PowerShell prompt in the repo, run the bundled installer:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.0.ps1
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.1.ps1
 ```
 
-3. **Fully quit and reopen Hermes Desktop.** The pane title should show **YouTube v3.0 ★**.
+3. **Fully quit and reopen Hermes Desktop.** The pane title should show **YouTube v3.1 ★**.
 
 > The installer writes the plugin into both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`.
 
