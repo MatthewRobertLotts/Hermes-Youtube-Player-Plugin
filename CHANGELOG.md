@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.6
+
+- Added **account integration**: detects your signed-in account (👤 shows the account name). When signed in, **History** pulls your real YouTube watch history, and the video-type dropdown gains **Subscriptions** and **Watch Later** from your account. Signed-out History falls back to local viewing history.
+
+
 ## v3.5
 
 - Added **Account / Sign in** — a button that temporarily makes the player area an interactive YouTube sign-in pane (session persists for playback), then **Done** returns to the locked media-player view.

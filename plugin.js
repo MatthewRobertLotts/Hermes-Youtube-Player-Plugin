@@ -2,13 +2,15 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.5-sign-in'
+const VERSION = 'v3.6-account-integration'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
   ['playlists', 'Playlists'],
-  ['history', 'History']
+  ['history', 'History'],
+  ['subscriptions', 'Subscriptions'],
+  ['watchlater', 'Watch Later']
 ]
 const HISTORY_KEY = 'hermes-yt-history'
 const HISTORY_MAX = 50
@@ -54,10 +56,24 @@ function watchUrl(videoId, playlistId) {
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
 const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
+// Signed-in feeds (only meaningful when the player partition is logged in).
+const ACCOUNT_FEEDS = {
+  subscriptions: 'https://www.youtube.com/feed/subscriptions',
+  watchlater: 'https://www.youtube.com/playlist?list=WL',
+  history: 'https://www.youtube.com/feed/history'
+}
 function searchSrc(query, filter) {
   const sp = SP_FILTERS[filter]
+  if (ACCOUNT_FEEDS[filter]) return ACCOUNT_FEEDS[filter] + '?persist_ts=' + Date.now()
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + (sp ? '&sp=' + sp : '')
 }
+const probeLoginScript = '(' + function () {
+  // The signed-in state shows an avatar button (#avatar-btn) in the masthead; signed-out shows
+  // a "Sign in" button instead. Check the persistent player/session webview.
+  const avatar = document.querySelector('#avatar-btn, ytd-topbar-menu-button-renderer #avatar-btn, button[aria-label*="account"]')
+  const signIn = Array.from(document.querySelectorAll('a,button')).some(el => /sign\s*in/i.test(el.textContent || '') && el.offsetParent !== null)
+  return { signedIn: !!avatar || !signIn, name: (avatar && (avatar.getAttribute('aria-label') || '')) || '' }
+}.toString() + ')()'
 
 const scrapeSearchScript = '(' + function () {
   const out = []
@@ -361,6 +377,23 @@ function YouTubeFloat() {
   const [loginPane, setLoginPane] = useState(false)
   const loginPaneRef = useRef(loginPane)
   loginPaneRef.current = loginPane
+  const [signedIn, setSignedIn] = useState(false)
+  const [accountName, setAccountName] = useState('')
+  // Probe the persistent session webview for login state whenever the account pane is used.
+  const probeLogin = async () => {
+    try {
+      const r = await playerRef.current?.executeJavaScript(probeLoginScript, true)
+      if (r) { setSignedIn(!!r.signedIn); setAccountName(r.name || '') }
+    } catch (e) {}
+  }
+  useEffect(() => {
+    if (loginPane) {
+      const t = window.setTimeout(probeLogin, 1600)
+      return () => window.clearTimeout(t)
+    }
+    probeLogin()
+    return undefined
+  }, [loginPane])
   const [streams, setStreams] = useState([])
   const [native, setNative] = useState(false)
   const searchRef = useRef(null)
@@ -380,11 +413,19 @@ function YouTubeFloat() {
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch (e) {}
   }
   const showHistory = () => {
+    // Signed in: pull the account's real watch history feed (scraped via the shared session webview).
+    if (signedIn) {
+      setQueueMode('search')
+      setStatus('Loading YouTube history…')
+      setResults([])
+      setSearchUrl(ACCOUNT_FEEDS.history + '&_=' + Date.now())
+      return
+    }
     setQueueMode('search')
     setSearchUrl(null)
     setResults(historyRef.current)
     setCurrentIndex(-1)
-    setStatus(historyRef.current.length ? 'History — pick a result' : 'No history yet')
+    setStatus(historyRef.current.length ? 'History (local) — pick a result' : 'No local history yet. Sign in to see your YouTube history.')
   }
 
   useEffect(() => {
@@ -596,10 +637,12 @@ function YouTubeFloat() {
     event.preventDefault()
     if (filter === 'history') { showHistory(); return }
     const next = draft.trim()
-    if (!next) return
-    const exact = videoIdFrom(next)
+    if (!next && !ACCOUNT_FEEDS[filter]) return
+    // Account-bound modes (Subscriptions / Watch Later) need a signed-in session.
+    if (ACCOUNT_FEEDS[filter] && !signedIn) { setStatus('Sign in first (Account button) to use ' + (SEARCH_FILTERS.find(f => f[0] === filter) || [])[1]); return }
+    const exact = !ACCOUNT_FEEDS[filter] && next ? videoIdFrom(next) : null
     if (exact) { setResults([]); capture(exact); return }
-    setStatus('Searching YouTube…')
+    setStatus(ACCOUNT_FEEDS[filter] ? 'Loading ' + ((SEARCH_FILTERS.find(f => f[0] === filter) || [])[1]) + '…' : 'Searching YouTube…')
     setResults([])
     setQueueMode('search')
     setSearchUrl(searchSrc(next, filter) + '&_=' + Date.now())
@@ -650,7 +693,7 @@ function YouTubeFloat() {
           ? jsx('webview', { key: videoId, className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))
     }),
-    searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
+    searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsxs('div', { className: 'mb-1 flex items-center gap-2', children: [
         jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
@@ -685,10 +728,10 @@ function YouTubeFloat() {
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => { const v = e.currentTarget.value; setFilter(v); if (v === 'history') showHistory() }, value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
       jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' }),
-      jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: () => { setLoginPane(p => !p); setVolumeOpen(false) }, title: loginPane ? 'Done — back to the locked player' : 'Sign in to your YouTube account', type: 'button', children: loginPane ? '✓ Done' : 'Account' })
+      jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: () => { setLoginPane(p => !p); setVolumeOpen(false) }, title: loginPane ? 'Done — back to the locked player' : signedIn ? ('Signed in' + (accountName ? ' as ' + accountName : '')) : 'Sign in to your YouTube account', type: 'button', children: loginPane ? '✓ Done' : (signedIn ? (accountName ? '👤 ' + accountName.slice(0, 12) : '👤 Signed in') : 'Account') })
     ] }),
     results.length ? jsx('div', { className: 'max-h-[30vh] min-h-0 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', (progress.videoId && result.id === progress.videoId) ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), result.type === 'playlist' ? jsx('span', { className: 'shrink-0 rounded bg-(--ui-accent)/20 px-1 py-0.5 text-[9px] font-medium text-(--ui-accent)', children: '▶ Playlist' }) : null, jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, (progress.videoId && result.id === progress.videoId) ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : jsx('div', { className: 'min-h-0 flex-1 border-t border-white/10 px-2 py-2 text-[11px] text-(--ui-text-quaternary)', children: status === 'Searching YouTube…' ? 'Searching… results will appear here.' : status })
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.5 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.6 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
