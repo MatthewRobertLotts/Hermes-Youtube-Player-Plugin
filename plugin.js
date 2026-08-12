@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.27-preferences-persistence'
+const VERSION = 'v3.28-media-controls-only'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -849,32 +849,16 @@ function YouTubeFloat() {
   }
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   useEffect(() => {
-    const volumeTo = v => { const next = Math.max(0, Math.min(1, v)); setVolume(next); void runCommand('volume', next) }
-    const keydown = e => {
-      const tag = String(e.target?.tagName || '').toLowerCase()
-      if (loginPane || historyPane || playlistsPane || /input|textarea|select/.test(tag)) return
-      const map = { ' ': 'playPause', k: 'playPause', ArrowLeft: 'rewind', j: 'rewind', ArrowRight: 'forward', l: 'forward' }
-      const action = map[e.key]
-      if (action) { e.preventDefault(); void runCommand(action); return }
-      if (e.key === 'ArrowUp') { e.preventDefault(); volumeTo(volume + 0.05) }
-      else if (e.key === 'ArrowDown') { e.preventDefault(); volumeTo(volume - 0.05) }
-      else if (e.key.toLowerCase() === 'm') { e.preventDefault(); volumeTo(volume ? 0 : 1) }
-    }
-    window.addEventListener('keydown', keydown)
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = progress.paused ? 'paused' : 'playing'
-      navigator.mediaSession.setActionHandler('play', () => void runCommand('play'))
-      navigator.mediaSession.setActionHandler('pause', () => void runCommand('pause'))
-      navigator.mediaSession.setActionHandler('previoustrack', () => playOffset(-1))
-      navigator.mediaSession.setActionHandler('nexttrack', () => playOffset(1))
-      navigator.mediaSession.setActionHandler('seekbackward', () => void runCommand('rewind'))
-      navigator.mediaSession.setActionHandler('seekforward', () => void runCommand('forward'))
-    }
-    return () => {
-      window.removeEventListener('keydown', keydown)
-      if ('mediaSession' in navigator) ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach(a => navigator.mediaSession.setActionHandler(a, null))
-    }
-  }, [volume, progress.paused, loginPane, historyPane, playlistsPane, results, currentIndex])
+    if (!('mediaSession' in navigator)) return undefined
+    navigator.mediaSession.playbackState = progress.paused ? 'paused' : 'playing'
+    navigator.mediaSession.setActionHandler('play', () => void runCommand('play'))
+    navigator.mediaSession.setActionHandler('pause', () => void runCommand('pause'))
+    navigator.mediaSession.setActionHandler('previoustrack', () => playOffset(-1))
+    navigator.mediaSession.setActionHandler('nexttrack', () => playOffset(1))
+    navigator.mediaSession.setActionHandler('seekbackward', () => void runCommand('rewind'))
+    navigator.mediaSession.setActionHandler('seekforward', () => void runCommand('forward'))
+    return () => ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach(a => navigator.mediaSession.setActionHandler(a, null))
+  }, [progress.paused, results, currentIndex])
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   // Static-title select: value pinned to a disabled-capable placeholder option carrying the label,
   // so the button always shows e.g. "Subs". On focus we sync the DOM value to the real selection so
@@ -957,4 +941,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.27 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.28 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

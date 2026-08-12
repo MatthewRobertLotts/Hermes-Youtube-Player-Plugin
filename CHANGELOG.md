@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.28
+- Removed in-app keyboard shortcuts because they intercepted normal Hermes typing.
+- Kept OS/browser Media Session controls only.
+- Kept v3.27 preference persistence.
+
 ## v3.27
 - Persisted safe preferences: Size, volume, loop mode, quality choice, and caption choice.
 - Deliberately did not persist videos/search/account feeds, so reopen does not autoplay or scrape account pages.
