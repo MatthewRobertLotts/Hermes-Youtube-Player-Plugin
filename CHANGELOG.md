@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.15
+
+- Removed the hardcoded fallback API key — the request uses only the live `ytcfg` key from the page.
+
+
 ## v3.14
 
 - **History fix:** browse request now uses the page's **live API key + client version** from `ytcfg` (not a hardcoded one YouTube rejects as stale), plus the `?key=` param.

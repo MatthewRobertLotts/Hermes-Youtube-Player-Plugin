@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.14-livecfg'
+const VERSION = 'v3.15-nokey'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -97,7 +97,7 @@ const scrapeFeedScript = '(' + function (feedKey) {
     // client versions on signed requests ("invalid argument").
     const cfg = (window.ytcfg && typeof window.ytcfg.get === 'function') ? window.ytcfg : ({ data: window.ytcfg })
     const getCfg = k => (cfg.get ? cfg.get(k) : (cfg.data ? cfg.data[k] : undefined)) || ''
-    const apiKey = getCfg('INNERTUBE_API_KEY') || 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+    const apiKey = getCfg('INNERTUBE_API_KEY') || ''
     const clientVersion = getCfg('INNERTUBE_CLIENT_VERSION') || '2.20241212.01.00'
     const clientName = getCfg('INNERTUBE_CLIENT_NAME') || 'WEB'
     const hl = getCfg('HL') || 'en'
@@ -842,4 +842,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.14 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.15 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
