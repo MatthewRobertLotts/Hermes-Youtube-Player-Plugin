@@ -2,7 +2,7 @@ import { cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.30-switchable-placement'
+const VERSION = 'v3.31-single-active-placement'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -965,12 +965,14 @@ export default {
     const playerData = placement => placement === 'floating'
       ? { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }
       : { placement: 'right', dock: { pane: 'workspace', pos: 'right' }, width: '420px', minWidth: '360px' }
+    const playerId = placement => placement === 'floating' ? 'player-floating' : 'player-docked'
     const registerPlayer = placement => {
       if (disposePlayer) disposePlayer()
       disposePlayer = ctx.register({
-        id: 'player',
+        // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
+        id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.30 ★',
+        title: 'YouTube v3.31 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, {})
       })

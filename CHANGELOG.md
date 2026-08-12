@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.31
+- Fixed Docked → Floating switch leaving both panes visible.
+- Uses separate internal pane ids for docked and floating while only registering the active one.
+- Keeps the Place dropdown and persisted placement.
+
 ## v3.30
 - Added a `Place` dropdown: switch the single player pane between Docked and Floating.
 - The plugin unregisters/re-registers the one pane instead of keeping two player instances.
