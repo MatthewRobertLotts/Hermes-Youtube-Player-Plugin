@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.19-history-cover'
+const VERSION = 'v3.20-your-playlists'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -10,7 +10,8 @@ const SEARCH_FILTERS = [
   ['playlists', 'Playlists'],
   ['history', 'History'],
   ['subscriptions', 'Subscriptions'],
-  ['watchlater', 'Watch Later']
+  ['watchlater', 'Watch Later'],
+  ['yourplaylists', 'Your Playlists']
 ]
 const HISTORY_KEY = 'hermes-yt-history'
 const HISTORY_MAX = 50
@@ -60,13 +61,23 @@ const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
 const ACCOUNT_FEEDS = {
   subscriptions: 'https://www.youtube.com/feed/subscriptions',
   watchlater: 'https://www.youtube.com/playlist?list=WL',
-  history: 'https://www.youtube.com/feed/history'
+  history: 'https://www.youtube.com/feed/history',
+  yourplaylists: 'https://www.youtube.com/'
 }
 function searchSrc(query, filter) {
   const sp = SP_FILTERS[filter]
   if (ACCOUNT_FEEDS[filter]) return ACCOUNT_FEEDS[filter] + '?persist_ts=' + Date.now()
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + (sp ? '&sp=' + sp : '')
 }
+const resolveOwnChannelScript = '(' + function () {
+  // Find the signed-in user's own channel href. Prefer the first guide entry link (/channel/UC…),
+  // fall back to the avatar's channel href, then any /@handle or /channel/UC… anchor.
+  const hrefs = []
+  try { document.querySelectorAll('a[href*="/channel/UC"], a[href^="/@"]').forEach(a => hrefs.push(a.href || a.getAttribute('href') || '')) } catch (e) {}
+  let href = ''
+  if (hrefs.length) href = hrefs.find(h => /\/channel\/UC[\w-]{20,}/.test(h)) || hrefs[0]
+  return { gaveHref: !!href, href: href.replace(location.origin, '') }
+}.toString() + ')()'
 const probeLoginScript = '(' + function () {
   // The signed-in state shows an avatar button (#avatar-btn) in the masthead; signed-out shows
   // a "Sign in" button instead. Check the persistent player/session webview.
@@ -392,6 +403,7 @@ function YouTubeFloat() {
   const loginPaneRef = useRef(loginPane)
   loginPaneRef.current = loginPane
   const [historyPane, setHistoryPane] = useState(false)
+  const [playlistsPane, setPlaylistsPane] = useState(false)
   const [signedIn, setSignedIn] = useState(false)
   const [accountName, setAccountName] = useState('')
   const signedInRef = useRef(signedIn)
@@ -419,6 +431,7 @@ function YouTubeFloat() {
   const searchRef = useRef(null)
   const playerRef = useRef(null)
   const historyPaneRef = useRef(null)
+  const playlistsPaneRef = useRef(null)
   const rootRef = useRef(null)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
@@ -453,6 +466,10 @@ function YouTubeFloat() {
   // Auto-probes login so the mode resolves correctly as soon as it's picked.
   const loadFeed = filter => {
     if (filter === 'history') { showHistory(); return }
+    if (filter === 'yourplaylists') {
+      if (!signedInRef.current) { setResults([]); setStatus('Sign in first (Account button) to use Your Playlists'); return }
+      setQueueMode('search'); setResults([]); setStatus('Loading your playlists…'); setPlaylistsPane(true); return
+    }
     const label = (SEARCH_FILTERS.find(f => f[0] === filter) || [])[1] || filter
     if (!ACCOUNT_FEEDS[filter]) { setSearchUrl(null); return }
     if (!signedInRef.current) { setResults([]); setSearchUrl(null); setStatus('Sign in first (Account button) to use ' + label); return }
@@ -475,6 +492,7 @@ function YouTubeFloat() {
     setVideoId(vid)
     setPlaylist(list || null)
     setVolumeOpen(false)
+    setPlaylistsPane(false)
     setNative(false)
     nativeRef.current = false
     setStreams([])
@@ -569,6 +587,47 @@ function YouTubeFloat() {
     const t = window.setTimeout(tick, 1200)
     return () => { cancelled = true; window.clearTimeout(t) }
   }, [historyPane])
+
+  // Playlists pane: resolve the user's own channel from the logged-in home page, then load that
+  // channel's /playlists tab and scrape playlistRenderer rows. Same visible-webview trick as History.
+  useEffect(() => {
+    if (!playlistsPane) return undefined
+    let cancelled = false
+    let phase = 'resolve' // 'resolve' -> 'load' -> done
+    let channelHref = ''
+    const tick = async () => {
+      if (cancelled || !playlistsPaneRef.current) return
+      try {
+        if (phase === 'resolve') {
+          const r = await playlistsPaneRef.current.executeJavaScript(resolveOwnChannelScript, true)
+          if (cancelled) return
+          if (!r || !r.gaveHref || !r.href) { phase = 'done'; setStatus('Could not find your channel — open Account and try again.'); setPlaylistsPane(false); return }
+          channelHref = r.href
+          phase = 'load'
+          playlistsPaneRef.current.src = 'https://www.youtube.com' + channelHref + '/playlists?_=' + Date.now()
+          window.setTimeout(tick, 1800)
+          return
+        }
+        const res = await playlistsPaneRef.current.executeJavaScript(scrapeSearchScript, true)
+        if (cancelled) return
+        const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(v.id))
+        if (clean.length) {
+          setResults(clean.map(i => ({ ...i, type: 'playlist' })))
+          setCurrentIndex(-1)
+          setStatus('Your playlists — pick one')
+          setPlaylistsPane(false)
+          return
+        }
+        attempts++
+        if (attempts < 15) { window.setTimeout(tick, 1000); return }
+        setStatus('Your playlists empty — no playlists appeared')
+        setPlaylistsPane(false)
+      } catch (e) { if (!cancelled) window.setTimeout(tick, 1000) }
+    }
+    let attempts = 0
+    const t = window.setTimeout(tick, 1200)
+    return () => { cancelled = true; window.clearTimeout(t) }
+  }, [playlistsPane])
 
   // Deterministic lock-down: when the account pane closes with a video loaded, re-apply the
   // chrome strip directly (don't wait on dom-ready timing — that raced after login before).
@@ -791,8 +850,13 @@ function YouTubeFloat() {
     jsx('div', {
       className: 'relative shrink-0 bg-black',
       style: { height: cfg().player },
-      children: historyPane
+      children: playlistsPane
         ? jsxs('div', { className: 'absolute inset-0', children: [
+            jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playlistsPaneRef, src: ACCOUNT_FEEDS.yourplaylists + '?_=' + Date.now() }),
+            jsx('div', { className: 'pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black px-3 text-center text-xs text-white/70', children: 'Loading your playlists…' })
+          ] })
+        : (historyPane
+            ? jsxs('div', { className: 'absolute inset-0', children: [
             jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: historyPaneRef, src: ACCOUNT_FEEDS.history + '?_=' + Date.now() }),
             // Keep the webview rendered (YouTube serves real data to a "visible" webview) but
             // cover it with an opaque loader so the raw browser flash never shows while loading.
@@ -802,7 +866,7 @@ function YouTubeFloat() {
         ? jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com' })
         : (videoId
           ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
-          : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })))
+          : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
@@ -845,4 +909,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.19 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.20 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.20
+
+- **Your Playlists:** new search-mode that resolves the signed-in user's channel, loads its `/playlists` tab in a visible pane, and lists their own playlists — picks open and play them.
+
+
 ## v3.19
 
 - Covered the History pane's raw browser flash with an opaque "Loading your YouTube history…" overlay while it scrapes.
