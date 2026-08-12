@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.7-feed-hooks'
+const VERSION = 'v3.8-login-lockfix'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -135,6 +135,10 @@ const scrapeSearchScript = '(' + function () {
       try { first = (pr.navigationEndpoint && pr.navigationEndpoint.watchEndpoint && pr.navigationEndpoint.watchEndpoint.videoId) || '' } catch (e) {}
       push(first || pr.playlistId, txt(pr.title).replace(/\s+/g, ' ').trim(), '', '', 'playlist', pr.playlistId)
     }
+    // History/feed items are often wrapped in richItemRenderer with the video nested in .content
+    // under a wrapper key; unwrap to the inner object so the specific renderers above can catch it.
+    const ri = o.richItemRenderer && o.richItemRenderer.content
+    if (ri) { for (const key in ri) { const inner = ri[key]; if (inner && typeof inner === 'object' && !inner.videoId) walk(inner) } }
     for (const k in o) walk(o[k])
   }
   try { walk(window.ytInitialData) } catch (e) {}
@@ -526,7 +530,9 @@ function YouTubeFloat() {
     // session's remembered caption preference doesn't leak in.
     const settle = window.setTimeout(() => { try { webview.executeJavaScript(driveScript('caption', captionRef.current), true) } catch {} }, 2500)
     return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle); if (retryTimer) window.clearInterval(retryTimer); if (failTimer) window.clearTimeout(failTimer) }
-  }, [videoId])
+  // loginPane in deps: leaving the account pane back to the locked player must re-arm the strip
+  // handler even when videoId is unchanged (see lock-down-after-login bug).
+  }, [videoId, loginPane])
 
   // Poll progress from YouTube's own player; auto-advance in-context when media ends.
   const resultsRef = useRef(results)
@@ -713,7 +719,7 @@ function YouTubeFloat() {
       children: loginPane
         ? jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com' })
         : (videoId
-          ? jsx('webview', { key: videoId, className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
+          ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
@@ -757,4 +763,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.7 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.8 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

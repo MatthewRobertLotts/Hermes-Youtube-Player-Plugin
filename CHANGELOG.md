@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.8
+
+- **Bug fix:** the player now locks back down immediately when you exit the account pane (previously it stayed unlocked until a new video was picked).
+- **Bug fix:** signed-in **History** now parses the rich/feed renderers it previously missed.
+
+
 ## v3.7
 
 - Fixed account feeds: **Subscriptions / Watch Later / History** now **auto-load on selection** (no blank Search needed), Watch Later/History parse their playlist renderers, and signed-out use prompts to sign in instead of silently failing.
