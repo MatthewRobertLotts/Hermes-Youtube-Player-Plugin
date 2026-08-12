@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.10
+
+- Deeper feed diagnostics: empty signed-in feeds now report the page title, whether `ytInitialData` exists, and body size — to pinpoint consent/sign-in walls vs genuinely empty pages.
+
+
 ## v3.9
 
 - **Deterministic lock-down** after leaving the account pane (strips directly instead of racing dom-ready).
