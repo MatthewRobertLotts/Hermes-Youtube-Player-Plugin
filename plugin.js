@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.17-hystatus'
+const VERSION = 'v3.18-visible-history'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -391,6 +391,7 @@ function YouTubeFloat() {
   const [loginPane, setLoginPane] = useState(false)
   const loginPaneRef = useRef(loginPane)
   loginPaneRef.current = loginPane
+  const [historyPane, setHistoryPane] = useState(false)
   const [signedIn, setSignedIn] = useState(false)
   const [accountName, setAccountName] = useState('')
   const signedInRef = useRef(signedIn)
@@ -417,6 +418,7 @@ function YouTubeFloat() {
   const [native, setNative] = useState(false)
   const searchRef = useRef(null)
   const playerRef = useRef(null)
+  const historyPaneRef = useRef(null)
   const rootRef = useRef(null)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
@@ -432,12 +434,13 @@ function YouTubeFloat() {
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch (e) {}
   }
   const showHistory = () => {
-    // Signed in: pull the account's real watch history feed (scraped via the shared session webview).
+    // Signed in: open a REAL visible history pane in the player area (YouTube serves real data
+    // to a visible webview; it serves an anti-bot stub to the hidden 1px one).
     if (signedIn) {
       setQueueMode('search')
-      setStatus('Loading YouTube history…')
+      setStatus('Loading your YouTube history…')
       setResults([])
-      setSearchUrl(ACCOUNT_FEEDS.history + '&_=' + Date.now())
+      setHistoryPane(true)
       return
     }
     setQueueMode('search')
@@ -537,6 +540,35 @@ function YouTubeFloat() {
   // loginPane in deps: leaving the account pane back to the locked player must re-arm the strip
   // handler even when videoId is unchanged (see lock-down-after-login bug).
   }, [videoId, loginPane])
+
+  // History pane: when open, scrape the visible history webview's rendered rows and close back
+  // to the locked player. Reuse scrapeSearchScript — the VISIBLE webview gets real ytInitialData.
+  useEffect(() => {
+    if (!historyPane) return undefined
+    let cancelled = false
+    let attempts = 0
+    const tick = async () => {
+      if (cancelled) return
+      try {
+        const res = await historyPaneRef.current?.executeJavaScript(scrapeSearchScript, true)
+        if (cancelled) return
+        const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title)
+        if (clean.length) {
+          setResults(clean)
+          setCurrentIndex(-1)
+          setStatus('YouTube history — pick a result')
+          setHistoryPane(false)
+          return
+        }
+        attempts++
+        if (attempts < 15) { window.setTimeout(tick, 1000); return }
+        setStatus('History empty — no items appeared' + (res && res.page ? ' (page: ' + (res.page.title || '?') + ')' : ''))
+        setHistoryPane(false)
+      } catch (e) { if (!cancelled) window.setTimeout(tick, 1000) }
+    }
+    const t = window.setTimeout(tick, 1200)
+    return () => { cancelled = true; window.clearTimeout(t) }
+  }, [historyPane])
 
   // Deterministic lock-down: when the account pane closes with a video loaded, re-apply the
   // chrome strip directly (don't wait on dom-ready timing — that raced after login before).
@@ -759,11 +791,13 @@ function YouTubeFloat() {
     jsx('div', {
       className: 'relative shrink-0 bg-black',
       style: { height: cfg().player },
-      children: loginPane
+      children: historyPane
+        ? jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: historyPaneRef, src: ACCOUNT_FEEDS.history + '?_=' + Date.now() })
+        : (loginPane
         ? jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com' })
         : (videoId
           ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
-          : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))
+          : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` })))
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
@@ -806,4 +840,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.17 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.18 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
