@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.21-playlists-fix'
+const VERSION = 'v3.22-account-feed-fix'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -61,11 +61,12 @@ const ACCOUNT_FEEDS = {
   subscriptions: 'https://www.youtube.com/feed/subscriptions',
   watchlater: 'https://www.youtube.com/playlist?list=WL',
   history: 'https://www.youtube.com/feed/history',
-  yourplaylists: 'https://www.youtube.com/'
+  yourplaylists: 'https://www.youtube.com/feed/you'
 }
+function cacheBust(url) { return url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now() }
 function searchSrc(query, filter) {
   const sp = SP_FILTERS[filter]
-  if (ACCOUNT_FEEDS[filter]) return ACCOUNT_FEEDS[filter] + '?persist_ts=' + Date.now()
+  if (ACCOUNT_FEEDS[filter]) return cacheBust(ACCOUNT_FEEDS[filter])
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + (sp ? '&sp=' + sp : '')
 }
 const resolveOwnChannelScript = '(' + function () {
@@ -147,11 +148,33 @@ const scrapeSearchScript = '(' + function () {
         push(id, String(title).replace(/\s+/g, ' ').trim(), thumb, String(dur).trim(), 'video', null)
       }
     }
+    const playlistFromEndpoint = ep => {
+      try {
+        const pl = ep && (ep.watchEndpoint && ep.watchEndpoint.playlistId || ep.commandMetadata && ep.commandMetadata.webCommandMetadata && ep.commandMetadata.webCommandMetadata.url || '')
+        const s = String(pl || '')
+        if (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(s)) return s
+        const m = s.match(/[?&]list=([^&]+)/)
+        return m ? decodeURIComponent(m[1]) : ''
+      } catch (e) { return '' }
+    }
     const pr = o.playlistRenderer
     if (pr && pr.playlistId) {
       let first = ''
       try { first = (pr.navigationEndpoint && pr.navigationEndpoint.watchEndpoint && pr.navigationEndpoint.watchEndpoint.videoId) || '' } catch (e) {}
       push(first || pr.playlistId, txt(pr.title).replace(/\s+/g, ' ').trim(), '', '', 'playlist', pr.playlistId)
+    }
+    // You page sometimes exposes playlist tiles as compact/rich/shelf renderers with only a
+    // navigationEndpoint URL, not playlistRenderer. Detect those by list=PL... links.
+    for (const key of ['compactPlaylistRenderer', 'gridPlaylistRenderer', 'radioRenderer']) {
+      const rr = o[key]
+      const plid = rr && (rr.playlistId || playlistFromEndpoint(rr.navigationEndpoint))
+      if (plid) push(plid, txt(rr.title).replace(/\s+/g, ' ').trim() || txt(rr.shortBylineText).trim() || 'Playlist', firstThumb(rr.thumbnail), badge(rr.thumbnail), 'playlist', plid)
+    }
+    const epList = playlistFromEndpoint(o.navigationEndpoint)
+    if (epList) {
+      let title = txt(o.title).replace(/\s+/g, ' ').trim()
+      try { if (!title) title = o.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}
+      if (title) push(epList, title, firstThumb(o.thumbnail || o.contentImage), badge(o.thumbnail || o.contentImage), 'playlist', epList)
     }
     // History/feed items are often wrapped in richItemRenderer with the video nested in .content
     // under a wrapper key; unwrap to the inner object so the specific renderers above can catch it.
@@ -479,7 +502,7 @@ function YouTubeFloat() {
     setQueueMode('search')
     setResults([])
     setStatus('Loading ' + label + '…')
-    setSearchUrl(ACCOUNT_FEEDS[filter] + '&_=' + Date.now())
+    setSearchUrl(cacheBust(ACCOUNT_FEEDS[filter]))
   }
 
   useEffect(() => {
@@ -591,35 +614,19 @@ function YouTubeFloat() {
     return () => { cancelled = true; window.clearTimeout(t) }
   }, [historyPane])
 
-  // Playlists pane: resolve the user's own channel from the logged-in home page, then load that
-  // channel's /playlists tab and scrape playlistRenderer rows. Same visible-webview trick as History.
+  // Playlists pane: load the signed-in You page and scrape the rendered playlist shelf.
+  // This avoids guessing the account channel URL, which varies by YouTube layout/account.
   useEffect(() => {
     if (!playlistsPane) return undefined
     let cancelled = false
-    let phase = 'resolve' // 'resolve' -> 'load' -> done
-    let channelHref = ''
-    let resolveTries = 0
+    let attempts = 0
     const tick = async () => {
       if (cancelled || !playlistsPaneRef.current) return
       try {
-        if (phase === 'resolve') {
-          const r = await playlistsPaneRef.current.executeJavaScript(resolveOwnChannelScript, true)
-          if (cancelled) return
-          if (!r || !r.gaveHref || !r.href) {
-            // Home page's guide may still be rendering — retry resolve for a few seconds.
-            resolveTries++
-            if (resolveTries < 8) { window.setTimeout(tick, 1000); return }
-            phase = 'done'; setStatus('Could not find your channel — open Account and try again.'); setPlaylistsPane(false); return
-          }
-          channelHref = r.href
-          phase = 'load'
-          playlistsPaneRef.current.src = 'https://www.youtube.com' + channelHref.replace(/^\//, '/') + '/playlists?_=' + Date.now()
-          window.setTimeout(tick, 1800)
-          return
-        }
         const res = await playlistsPaneRef.current.executeJavaScript(scrapeSearchScript, true)
         if (cancelled) return
-        const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(v.id))
+        const found = res && Array.isArray(res.items) ? res.items : []
+        const clean = found.filter(v => v?.id && v?.title && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(v.id))
         if (clean.length) {
           setResults(clean.map(i => ({ ...i, type: 'playlist' })))
           setCurrentIndex(-1)
@@ -628,13 +635,14 @@ function YouTubeFloat() {
           return
         }
         attempts++
-        if (attempts < 15) { window.setTimeout(tick, 1000); return }
-        setStatus('Your playlists empty — no playlists appeared')
+        if (attempts < 18) { window.setTimeout(tick, 1000); return }
+        const rk = (res && res.renderers) ? Object.entries(res.renderers).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => k + '×' + n).join(', ') : 'none'
+        const pg = res && res.page ? ' | page: ' + (res.page.title || '?').slice(0, 40) + ' url=' + (res.page.url || '?').slice(0, 70) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''
+        setStatus('Your playlists empty (renderers: ' + rk + pg + ')')
         setPlaylistsPane(false)
       } catch (e) { if (!cancelled) window.setTimeout(tick, 1000) }
     }
-    let attempts = 0
-    const t = window.setTimeout(tick, 1200)
+    const t = window.setTimeout(tick, 1600)
     return () => { cancelled = true; window.clearTimeout(t) }
   }, [playlistsPane])
 
@@ -817,7 +825,7 @@ function YouTubeFloat() {
     setStatus(ACCOUNT_FEEDS[filter] ? 'Loading ' + ((SEARCH_FILTERS.find(f => f[0] === filter) || [])[1]) + '…' : 'Searching YouTube…')
     setResults([])
     setQueueMode('search')
-    setSearchUrl(searchSrc(next, filter) + '&_=' + Date.now())
+    setSearchUrl(searchSrc(next, filter))
   }
   const play = (result, index) => {
     // Remember anything a user actually plays (skip bare playlist entry rows).
@@ -861,12 +869,12 @@ function YouTubeFloat() {
       style: { height: cfg().player },
       children: playlistsPane
         ? jsxs('div', { className: 'absolute inset-0', children: [
-            jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playlistsPaneRef, src: ACCOUNT_FEEDS.yourplaylists + '?_=' + Date.now() }),
+            jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playlistsPaneRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }),
             jsx('div', { className: 'pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black px-3 text-center text-xs text-white/70', children: 'Loading your playlists…' })
           ] })
         : (historyPane
             ? jsxs('div', { className: 'absolute inset-0', children: [
-            jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: historyPaneRef, src: ACCOUNT_FEEDS.history + '?_=' + Date.now() }),
+            jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: historyPaneRef, src: cacheBust(ACCOUNT_FEEDS.history) }),
             // Keep the webview rendered (YouTube serves real data to a "visible" webview) but
             // cover it with an opaque loader so the raw browser flash never shows while loading.
             jsx('div', { className: 'pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black px-3 text-center text-xs text-white/70', children: 'Loading your YouTube history…' })
@@ -918,4 +926,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.21 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.22 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

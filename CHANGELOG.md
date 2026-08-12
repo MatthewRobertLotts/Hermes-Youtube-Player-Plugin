@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.22
+- **Subscriptions/Watch Later auto-load:** fixed account feed cache-busting URLs so dropdown selection uses valid `?`/`&` URLs; no manual blank search should be needed.
+- **Your Playlists:** now loads YouTube's signed-in `You` page directly and scrapes rendered playlist tiles, avoiding fragile channel URL resolution.
+- Kept search field blank; no built-in default search term.
+
 ## v3.21
 
 - **Your Playlists:** broader channel lookup (guide + avatar anchors) with retries while the home page renders.
