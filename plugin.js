@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.8-login-lockfix'
+const VERSION = 'v3.9-lockfix+diag'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -78,6 +78,7 @@ const probeLoginScript = '(' + function () {
 const scrapeSearchScript = '(' + function () {
   const out = []
   const seen = new Set()
+  const keyCount = {}
   const push = (id, title, thumb, duration, type, list) => {
     if (!id || seen.has(id) || !title || /now playing/i.test(title)) return
     seen.add(id)
@@ -90,6 +91,9 @@ const scrapeSearchScript = '(' + function () {
     if (out.length >= 14 || !o) return
     if (Array.isArray(o)) { for (const x of o) walk(x); return }
     if (typeof o !== 'object') return
+    if (o.constructor && o.constructor.name === 'Object') {
+      for (const k in o) { if (/Renderer|ViewModel$/.test(k) && typeof o[k] === 'object') keyCount[k] = (keyCount[k] || 0) + 1 }
+    }
     const vr = o.videoRenderer
     if (vr && vr.videoId) {
       const url = (vr.navigationEndpoint && vr.navigationEndpoint.commandMetadata && vr.navigationEndpoint.commandMetadata.webCommandMetadata && vr.navigationEndpoint.commandMetadata.webCommandMetadata.url) || ''
@@ -142,7 +146,7 @@ const scrapeSearchScript = '(' + function () {
     for (const k in o) walk(o[k])
   }
   try { walk(window.ytInitialData) } catch (e) {}
-  return out
+  return { items: out, renderers: keyCount }
 }.toString() + ')()'
 
 const stripScript = '(' + function () {
@@ -534,6 +538,25 @@ function YouTubeFloat() {
   // handler even when videoId is unchanged (see lock-down-after-login bug).
   }, [videoId, loginPane])
 
+  // Deterministic lock-down: when the account pane closes with a video loaded, re-apply the
+  // chrome strip directly (don't wait on dom-ready timing — that raced after login before).
+  const prevLoginRef = useRef(loginPane)
+  useEffect(() => {
+    if (prevLoginRef.current && !loginPane && videoId) {
+      const tryStrip = async () => {
+        for (let i = 0; i < 5; i++) {
+          try {
+            const r = await playerRef.current?.executeJavaScript(stripScript, true)
+            if (r && r.ok) return
+          } catch (e) {}
+          await new Promise(res => window.setTimeout(res, 400))
+        }
+      }
+      void tryStrip()
+    }
+    prevLoginRef.current = loginPane
+  }, [loginPane, videoId])
+
   // Poll progress from YouTube's own player; auto-advance in-context when media ends.
   const resultsRef = useRef(results)
   resultsRef.current = results
@@ -646,13 +669,17 @@ function YouTubeFloat() {
     let cancelled = false
     const done = async () => {
       try {
-        const found = await webview.executeJavaScript(scrapeSearchScript, true)
+        const res = await webview.executeJavaScript(scrapeSearchScript, true)
         if (cancelled || queueModeRef.current === 'playlist') return
-        const clean = Array.isArray(found) ? found.filter(v => v?.id && v?.title) : []
+        const found = res && Array.isArray(res.items) ? res.items : (Array.isArray(res) ? res : [])
+        const clean = found.filter(v => v?.id && v?.title)
         setResults(clean)
         setCurrentIndex(-1)
         if (clean[0]) setStatus('Choose a result')
-        else setStatus('No videos found')
+        else if (searchUrl && /feed\//.test(searchUrl)) {
+          const rk = (res && res.renderers) ? Object.entries(res.renderers).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => k + '×' + n).join(', ') : 'none'
+          setStatus('Feed returned no videos (renderers: ' + rk + ')')
+        } else setStatus('No videos found')
       } catch (error) { if (!cancelled) setStatus(error instanceof Error ? error.message : String(error)) }
     }
     const finish = () => void done()
@@ -763,4 +790,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.8 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.9 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

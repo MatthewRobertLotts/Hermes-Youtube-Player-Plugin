@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.9
+
+- **Deterministic lock-down** after leaving the account pane (strips directly instead of racing dom-ready).
+- **Self-diagnosing feeds:** if a signed-in feed returns nothing, the status line reports the renderers the page actually contained, so we can fix the real cause instead of guessing.
+
+
 ## v3.8
 
 - **Bug fix:** the player now locks back down immediately when you exit the account pane (previously it stayed unlocked until a new video was picked).
