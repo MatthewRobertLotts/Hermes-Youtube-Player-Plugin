@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.16-dom-history'
+const VERSION = 'v3.17-hystatus'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -690,7 +690,7 @@ function YouTubeFloat() {
         setResults(clean)
         setCurrentIndex(-1)
         if (clean[0]) setStatus('History — pick a result')
-        else if (filter === 'history') setStatus('History empty — no items appeared after wait')
+        else if (filter === 'history') { const pg = res && res.page ? ' | ' + (res.page.title || '?').slice(0, 40) + ' url=' + (res.page.url || '?').slice(0, 50) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''; setStatus('History empty — no items after wait' + pg) }
         else if (searchUrl && /feed\//.test(searchUrl)) {
           const rk = (res && res.renderers) ? Object.entries(res.renderers).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => k + '×' + n).join(', ') : 'none'
           const pg = res && res.page ? ' | page: ' + (res.page.title || '?').slice(0, 40) + ' url=' + (res.page.url || '?').slice(0, 60) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''
@@ -806,4 +806,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.16 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.17 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

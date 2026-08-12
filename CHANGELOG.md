@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.17
+
+- Empty-history status now reports the page title / URL / `ytInitialData` presence, to pinpoint whether history hits a consent wall or a real (empty) watch-history page.
+
+
 ## v3.16
 
 - **History reworked:** loads `/feed/history` and DOM-scrapes with a patient retry until YouTube hydrates the items (dropped the fragile browse-API approach).
