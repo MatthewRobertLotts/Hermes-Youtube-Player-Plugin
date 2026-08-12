@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.26-keyboard-media-controls'
+const VERSION = 'v3.27-preferences-persistence'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -13,7 +13,10 @@ const SEARCH_FILTERS = [
   ['yourplaylists', 'Your Playlists']
 ]
 const HISTORY_KEY = 'hermes-yt-history'
+const PREF_KEY = 'hermes-yt-prefs'
 const HISTORY_MAX = 50
+const readPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {} } catch (e) { return {} } }
+const savePrefs = prefs => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
 const PLAYER_SIZES = {
   mini: { label: 'Mini', width: '420px', height: '310px', player: '236px' },
   small: { label: 'Small', width: '500px', height: '500px', player: '281px' },
@@ -398,9 +401,10 @@ const playlistFillScript = '(' + function () {
 }.toString() + ')()'
 
 function YouTubeFloat() {
+  const prefs = useMemo(readPrefs, [])
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
-  const [playerSize, setPlayerSize] = useState('large')
+  const [playerSize, setPlayerSize] = useState(PLAYER_SIZES[prefs.playerSize] ? prefs.playerSize : 'large')
   const [videoId, setVideoId] = useState(null)
   const [playlist, setPlaylist] = useState(null)
   const [queueMode, setQueueMode] = useState('search')
@@ -408,14 +412,14 @@ function YouTubeFloat() {
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [status, setStatus] = useState('Search for a video')
   const [searchUrl, setSearchUrl] = useState(null)
-  const [loopMode, setLoopMode] = useState('off')
-  const [quality, setQuality] = useState('auto')
+  const [loopMode, setLoopMode] = useState(['off', 'once', 'inf'].includes(prefs.loopMode) ? prefs.loopMode : 'off')
+  const [quality, setQuality] = useState(prefs.quality || 'auto')
   const [qualities, setQualities] = useState(['auto'])
-  const [caption, setCaption] = useState('off')
-  const captionRef = useRef('off')
+  const [caption, setCaption] = useState(prefs.caption || 'off')
+  const captionRef = useRef(caption)
   const [captions, setCaptions] = useState([])
   const [progress, setProgress] = useState({ current: 0, duration: 0, paused: true })
-  const [volume, setVolume] = useState(1)
+  const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
   const [volumeOpen, setVolumeOpen] = useState(false)
   const [loginPane, setLoginPane] = useState(false)
   const loginPaneRef = useRef(loginPane)
@@ -506,6 +510,10 @@ function YouTubeFloat() {
     window.dispatchEvent(new Event('resize'))
   }, [playerSize])
 
+  useEffect(() => {
+    savePrefs({ playerSize, volume, loopMode, quality, caption })
+  }, [playerSize, volume, loopMode, quality, caption])
+
   const capture = (vid, list) => {
     setVideoId(vid)
     setPlaylist(list || null)
@@ -545,6 +553,8 @@ function YouTubeFloat() {
       if (loginPaneRef.current) return
       try {
         await webview.executeJavaScript(stripScript, true)
+        await webview.executeJavaScript(driveScript('volume', volume), true)
+        await webview.executeJavaScript(driveScript('loop', loopMode), true)
         await webview.executeJavaScript(driveScript('caption', captionRef.current), true)
         const r = await webview.executeJavaScript(readPlayerScript, true)
         if (r) {
@@ -947,4 +957,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.26 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.27 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

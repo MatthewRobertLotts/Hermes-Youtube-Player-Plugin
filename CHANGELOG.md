@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.27
+- Persisted safe preferences: Size, volume, loop mode, quality choice, and caption choice.
+- Deliberately did not persist videos/search/account feeds, so reopen does not autoplay or scrape account pages.
+
 ## v3.26
 - Added keyboard shortcuts: Space/K play-pause, J/Left rewind, L/Right forward, Up/Down volume, M mute.
 - Added Media Session handlers for OS/media-key play, pause, previous, next, rewind, and forward.
