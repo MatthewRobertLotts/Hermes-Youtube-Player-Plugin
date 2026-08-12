@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.37-floating-header-close'
+const VERSION = 'v3.38-status-chip-floating-close'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -21,7 +21,10 @@ let setPlayerPlacement = null
 let setPlayerOpen = null
 let closePlayerPane = null
 let playerOpenState = true
+let playerPlacementState = 'docked'
 let livePlayerState = null
+const statusListeners = new Set()
+const emitPlayerStatus = () => statusListeners.forEach(fn => { try { fn({ open: playerOpenState, placement: playerPlacementState }) } catch (e) {} })
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
 const savePrefs = prefs => { try { pluginStorage ? pluginStorage.set('prefs', prefs) : localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
 const PLAYER_SIZES = {
@@ -532,7 +535,8 @@ function YouTubeFloat({ pane = false } = {}) {
     if (!pane || placement !== 'floating') return undefined
     let button = null
     const mount = () => {
-      const header = document.querySelector('[data-floating-pane="player-floating"] header')
+      const shell = rootRef.current?.closest?.('[data-floating-pane]') || document.querySelector('[data-floating-pane="player-floating"]')
+      const header = shell?.querySelector?.('header')
       if (!header || header.querySelector('[data-youtube-float-close]')) return
       button = document.createElement('button')
       button.dataset.youtubeFloatClose = '1'
@@ -544,10 +548,13 @@ function YouTubeFloat({ pane = false } = {}) {
       button.onclick = event => { event.preventDefault(); event.stopPropagation(); if (closePlayerPane) closePlayerPane() }
       header.appendChild(button)
     }
+    const observer = new MutationObserver(mount)
+    observer.observe(document.body, { childList: true, subtree: true })
     const timer = window.setTimeout(mount, 0)
     mount()
-    return () => { window.clearTimeout(timer); if (button && button.parentNode) button.parentNode.removeChild(button) }
+    return () => { observer.disconnect(); window.clearTimeout(timer); if (button && button.parentNode) button.parentNode.removeChild(button) }
   }, [pane, placement])
+
 
   const capture = (vid, list) => {
     setVideoId(vid)
@@ -993,14 +1000,25 @@ function YouTubeFloat({ pane = false } = {}) {
 }
 
 function YouTubeStatusChip() {
-  return jsx('button', {
-    className: 'inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground',
+  const [state, setState] = useState({ open: playerOpenState, placement: playerPlacementState })
+  useEffect(() => { statusListeners.add(setState); setState({ open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
+  const mode = state.placement === 'floating' ? 'Floating' : 'Docked'
+  const label = '▶ YouTube ' + (state.open ? 'Open' : 'Closed') + (state.open ? ' (' + mode + ')' : '')
+  return jsxs('button', {
+    className: cn(
+      'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] transition-colors hover:bg-(--chrome-action-hover)',
+      state.open ? 'text-emerald-400 hover:text-emerald-300' : 'text-red-400 hover:text-red-300'
+    ),
     onClick: () => { if (setPlayerOpen) setPlayerOpen(!playerOpenState) },
-    title: 'Open YouTube player',
+    title: state.open ? 'YouTube player is open in ' + mode + ' mode — click to close' : 'YouTube player is closed — click to open',
     type: 'button',
-    children: '▶ YouTube'
+    children: [
+      jsx('span', { className: cn('size-1.5 rounded-full', state.open ? 'animate-pulse bg-emerald-400' : 'animate-pulse bg-red-400') }),
+      jsx('span', { children: label })
+    ]
   })
 }
+
 
 export default {
   id: 'youtube-float',
@@ -1022,11 +1040,13 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.37 ★',
+        title: 'YouTube v3.38 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
       playerOpenState = true
+      playerPlacementState = placement === 'floating' ? 'floating' : 'docked'
+      emitPlayerStatus()
     }
     setPlayerOpen = open => {
       playerOpenState = open !== false
@@ -1034,6 +1054,7 @@ export default {
       if (!playerOpenState) {
         if (disposePlayer) disposePlayer()
         disposePlayer = null
+        emitPlayerStatus()
         return
       }
       registerPlayer(readPrefs().placement === 'floating' ? 'floating' : 'docked')
@@ -1045,7 +1066,7 @@ export default {
       registerPlayer(clean)
     }
     if (readPrefs().playerOpen !== false) registerPlayer(readPrefs().placement === 'floating' ? 'floating' : 'docked')
-    else playerOpenState = false
+    else { playerOpenState = false; playerPlacementState = readPrefs().placement === 'floating' ? 'floating' : 'docked'; emitPlayerStatus() }
     ctx.registerMany([
       {
         id: 'page',

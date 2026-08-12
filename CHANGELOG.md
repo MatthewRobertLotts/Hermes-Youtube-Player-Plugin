@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.38
+- Made the status-bar chip stateful: green Open, red Closed, and shows Floating/Docked mode when open.
+- Added a pulsing status dot to the chip for clearer state guidance.
+- Made the floating header close injection more robust by anchoring from the mounted player to the nearest floating pane shell.
+
 ## v3.37
 - Added an `×` close button to the floating player header.
 - Keeps the docked player close glyph in the Hermes tab strip.
