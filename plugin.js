@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.15-nokey'
+const VERSION = 'v3.16-dom-history'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -67,53 +67,6 @@ function searchSrc(query, filter) {
   if (ACCOUNT_FEEDS[filter]) return ACCOUNT_FEEDS[filter] + '?persist_ts=' + Date.now()
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + (sp ? '&sp=' + sp : '')
 }
-const scrapeFeedScript = '(' + function (feedKey) {
-  // History (and similar) feeds load their items via the /youtubei/v1/browse AJAX, not in
-  // ytInitialData — so DOM scraping always sees an empty shell. Fetch the browse API directly
-  // (same-origin, logged-in partition) for a reliable JSON response.
-  const BROWSE_ID = { history: 'FEmy_videos' }
-  const out = []
-  const seen = new Set()
-  const push = (id, title, thumb, duration, type, list) => { if (!id || seen.has(id) || !title) return; seen.add(id); out.push({ duration, id, list: list || null, title, thumb, type }) }
-  const txt = x => (x && (x.simpleText || ((x.runs || [{ text: '' }]).map(r => r.text).join('')))) || ''
-  const walk = o => {
-    if (!o || typeof o !== 'object') return
-    if (Array.isArray(o)) { for (const x of o) walk(x); return }
-    const vr = o.videoRenderer
-    if (vr && vr.videoId) { const img = vr.thumbnail && vr.thumbnail.thumbnails; push(vr.videoId, txt(vr.title).replace(/\s+/g, ' ').trim(), img && img[img.length - 1] ? img[img.length - 1].url : '', txt(vr.lengthText).trim(), 'video', null) }
-    const pvr = o.playlistVideoRenderer
-    if (pvr && pvr.videoId) { const img = pvr.thumbnail && pvr.thumbnail.thumbnails; push(pvr.videoId, txt(pvr.title).replace(/\s+/g, ' ').trim(), img && img[img.length - 1] ? img[img.length - 1].url : '', txt(pvr.lengthText).trim(), 'video', null) }
-    const lv = o.lockupViewModel
-    if (lv && lv.contentId) { let t = ''; try { t = lv.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}; const th = (lv.contentImage && lv.contentImage.thumbnailViewModel && lv.contentImage.thumbnailViewModel.image && lv.contentImage.thumbnailViewModel.image.sources && lv.contentImage.thumbnailViewModel.image.sources[0] && lv.contentImage.thumbnailViewModel.image.sources[0].url) || ''; if (/^[a-zA-Z0-9_-]{11}$/.test(lv.contentId)) push(lv.contentId, String(t).replace(/\s+/g, ' ').trim(), th, '', 'video', null) }
-    for (const k in o) walk(o[k])
-  }
-  const bid = BROWSE_ID[feedKey] || 'FEmy_videos'
-  const getCookie = n => { const m = document.cookie.match('(?:^|; )'+n+'=([^;]*)'); return m ? decodeURIComponent(m[1]) : '' }
-  const sha1hex = async s => { const b = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(s)); return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2,'0')).join('') }
-  const sign = async () => { const sapisid = getCookie('SAPISID') || getCookie('__Secure-3PAPISID') || getCookie('__Secure-3PSID') || getCookie('SID') || ''; if (!sapisid) return ''; const time = Math.floor(Date.now()/1000); const origin = location.origin || 'https://www.youtube.com'; const hash = await sha1hex(time+' '+sapisid+' '+origin); return 'SAPISIDHASH '+time+'_'+hash }
-  return (async () => {
-    const auth = await sign()
-    // Use the page's OWN live API key + client version (ytcfg) — YouTube rejects stale/hardcoded
-    // client versions on signed requests ("invalid argument").
-    const cfg = (window.ytcfg && typeof window.ytcfg.get === 'function') ? window.ytcfg : ({ data: window.ytcfg })
-    const getCfg = k => (cfg.get ? cfg.get(k) : (cfg.data ? cfg.data[k] : undefined)) || ''
-    const apiKey = getCfg('INNERTUBE_API_KEY') || ''
-    const clientVersion = getCfg('INNERTUBE_CLIENT_VERSION') || '2.20241212.01.00'
-    const clientName = getCfg('INNERTUBE_CLIENT_NAME') || 'WEB'
-    const hl = getCfg('HL') || 'en'
-    const gl = getCfg('GL') || 'GB'
-    const headers = { 'Content-Type': 'application/json', 'X-YouTube-Client-Name': '1', 'X-YouTube-Client-Version': clientVersion }
-    if (auth) headers['Authorization'] = auth
-    const visitor = getCookie('VISITOR_INFO1_LIVE') || getCfg('VISITOR_DATA')
-    if (visitor) headers['X-Goog-Visitor-Id'] = visitor
-    const r = await fetch('/youtubei/v1/browse?key=' + encodeURIComponent(apiKey), { method: 'POST', credentials: 'include', headers, body: JSON.stringify({ context: { client: { clientName, clientVersion, hl, gl } }, browseId: bid }) })
-    const data = await r.json()
-    walk(data)
-    if (data && data.error) return { error: (data.error.message || 'browse error') + ' (signed=' + !!auth + ' cv=' + clientVersion + ')', items: [] }
-    return { items: out, renderers: {} }
-  })().catch(e => ({ error: String(e.message || e), items: [] }))
-}.toString() + ')("history")'
-
 const probeLoginScript = '(' + function () {
   // The signed-in state shows an avatar button (#avatar-btn) in the masthead; signed-out shows
   // a "Sign in" button instead. Check the persistent player/session webview.
@@ -716,9 +669,20 @@ function YouTubeFloat() {
     let cancelled = false
     const done = async () => {
       try {
-        const res = filter === 'history'
-          ? await webview.executeJavaScript(scrapeFeedScript, true)
-          : await webview.executeJavaScript(scrapeSearchScript, true)
+        if (cancelled || queueModeRef.current === 'playlist') return
+        // History is DOM-scraped like search (YouTube hydrates /feed/history a few seconds after
+        // load — your dev-tools screenshot confirmed items DO render). Retry patiently until items
+        // appear instead of grabbing the empty shell.
+        let res = null
+        if (filter === 'history') {
+          for (let attempt = 0; attempt < 12 && !cancelled; attempt++) {
+            res = await webview.executeJavaScript(scrapeSearchScript, true)
+            if (res && Array.isArray(res.items) && res.items.filter(v => v.id && v.title).length) break
+            await new Promise(r => window.setTimeout(r, 1200))
+          }
+        } else {
+          res = await webview.executeJavaScript(scrapeSearchScript, true)
+        }
         if (cancelled || queueModeRef.current === 'playlist') return
         if (res && res.error) { if (!cancelled) setStatus('History: ' + String(res.error)); return }
         const found = res && Array.isArray(res.items) ? res.items : (Array.isArray(res) ? res : [])
@@ -726,7 +690,7 @@ function YouTubeFloat() {
         setResults(clean)
         setCurrentIndex(-1)
         if (clean[0]) setStatus('History — pick a result')
-        else if (filter === 'history') setStatus('History empty (no items in browse response)')
+        else if (filter === 'history') setStatus('History empty — no items appeared after wait')
         else if (searchUrl && /feed\//.test(searchUrl)) {
           const rk = (res && res.renderers) ? Object.entries(res.renderers).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => k + '×' + n).join(', ') : 'none'
           const pg = res && res.page ? ' | page: ' + (res.page.title || '?').slice(0, 40) + ' url=' + (res.page.url || '?').slice(0, 60) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''
@@ -842,4 +806,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.15 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.16 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

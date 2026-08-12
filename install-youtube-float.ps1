@@ -19,7 +19,7 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v3.15-nokey') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v3.16-dom-history') { throw "Copy verification failed: $_" }
   $written += $_
 }
 Write-Host 'Installed YouTube Float v68 (MILESTONE) to:'

@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.16
+
+- **History reworked:** loads `/feed/history` and DOM-scrapes with a patient retry until YouTube hydrates the items (dropped the fragile browse-API approach).
+
+
 ## v3.15
 
 - Removed the hardcoded fallback API key — the request uses only the live `ytcfg` key from the page.
