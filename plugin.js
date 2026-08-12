@@ -2,7 +2,7 @@ import { cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.33-seamless-placement-switch'
+const VERSION = 'v3.34-fast-placement-switch'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -56,10 +56,11 @@ function videoIdFrom(input) {
   return null
 }
 
-function watchUrl(videoId, playlistId) {
+function watchUrl(videoId, playlistId, startAt = 0) {
   if (!videoId) return 'about:blank'
-  if (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(videoId)) return 'https://www.youtube.com/playlist?list=' + encodeURIComponent(videoId) + '&autoplay=1'
-  const base = 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1'
+  const start = Math.max(0, Math.floor(Number(startAt) || 0))
+  if (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(videoId)) return 'https://www.youtube.com/playlist?list=' + encodeURIComponent(videoId) + '&autoplay=1' + (start > 1 ? '&t=' + start + 's' : '')
+  const base = 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' + (start > 1 ? '&t=' + start + 's' : '')
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
 const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
@@ -425,6 +426,7 @@ function YouTubeFloat() {
   const [captions, setCaptions] = useState([])
   const [progress, setProgress] = useState({ current: resume?.current || 0, duration: 0, paused: resume ? resume.paused !== false : true })
   const resumeRef = useRef(resume)
+  const resumeStart = resume?.videoId ? resume.current || 0 : 0
   const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
   const [volumeOpen, setVolumeOpen] = useState(false)
   const [loginPane, setLoginPane] = useState(false)
@@ -565,7 +567,6 @@ function YouTubeFloat() {
         await webview.executeJavaScript(driveScript('caption', captionRef.current), true)
         const handoff = resumeRef.current
         if (handoff && handoff.videoId === videoId) {
-          if (handoff.current > 1) await webview.executeJavaScript(driveScript('seek', handoff.current), true)
           if (handoff.paused) await webview.executeJavaScript(driveScript('pause'), true)
           resumeRef.current = null
           savePrefs({ ...readPrefs(), resume: null })
@@ -890,17 +891,9 @@ function YouTubeFloat() {
   })
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
   const mini = playerSize === 'mini'
-  const togglePlacement = async () => {
+  const togglePlacement = () => {
     const v = placement === 'docked' ? 'floating' : 'docked'
     const snap = videoId ? { at: Date.now(), current: progress.current || 0, paused: progress.paused, playlist, videoId } : null
-    try {
-      const r = await playerRef.current?.executeJavaScript(stateScript, true)
-      if (r && r.ok && (r.videoId || videoId)) {
-        snap.videoId = r.videoId || videoId
-        snap.current = r.current || snap.current
-        snap.paused = r.paused
-      }
-    } catch {}
     if (snap?.videoId) savePrefs({ ...readPrefs(), placement: v, resume: snap })
     setPlacement(v)
     if (setPlayerPlacement) setPlayerPlacement(v)
@@ -926,7 +919,7 @@ function YouTubeFloat() {
         : (loginPane
         ? jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com' })
         : (videoId
-          ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist) })
+          ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart) })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
@@ -999,7 +992,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.33 ★',
+        title: 'YouTube v3.34 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, {})
       })

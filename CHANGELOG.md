@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.34
+- Made pin/unpin immediate by removing the blocking webview JavaScript round-trip from the click handler.
+- Resume now uses the last known React progress snapshot and YouTube's `t=` URL start time.
+- Keeps paused-state restoration after load, but placement change itself is synchronous.
+
 ## v3.33
 - Placement switching now resumes the current video after pin/unpin.
 - Saves a short-lived handoff snapshot: video id, playlist id, timestamp, and paused state.
