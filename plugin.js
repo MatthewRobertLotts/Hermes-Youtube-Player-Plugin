@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.12-browse-api'
+const VERSION = 'v3.13-sapisid'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -88,12 +88,21 @@ const scrapeFeedScript = '(' + function (feedKey) {
     for (const k in o) walk(o[k])
   }
   const bid = BROWSE_ID[feedKey] || 'FEmy_videos'
-  return fetch('/youtubei/v1/browse?prettyPrint=false', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ context: { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } }, browseId: bid })
-  }).then(r => r.json()).then(data => { walk(data); return data && data.error ? { error: data.error.message || 'browse error', items: [] } : { items: out, renderers: {} } }).catch(e => ({ error: String(e.message || e), items: [] }))
+  const getCookie = n => { const m = document.cookie.match('(?:^|; )'+n+'=([^;]*)'); return m ? decodeURIComponent(m[1]) : '' }
+  const sha1hex = async s => { const b = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(s)); return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2,'0')).join('') }
+  const sign = async () => { const sapisid = getCookie('SAPISID') || getCookie('__Secure-3PAPISID') || getCookie('__Secure-3PSID') || getCookie('SID') || ''; if (!sapisid) return ''; const time = Math.floor(Date.now()/1000); const origin = location.origin || 'https://www.youtube.com'; const hash = await sha1hex(time+' '+sapisid+' '+origin); return 'SAPISIDHASH '+time+'_'+hash }
+  return (async () => {
+    const auth = await sign()
+    const headers = { 'Content-Type': 'application/json', 'X-YouTube-Client-Name': '1', 'X-YouTube-Client-Version': '2.20240101.00.00' }
+    if (auth) headers['Authorization'] = auth
+    const visitor = getCookie('VISITOR_INFO1_LIVE')
+    if (visitor) headers['X-Goog-Visitor-Id'] = visitor
+    const r = await fetch('/youtubei/v1/browse?prettyPrint=false', { method: 'POST', credentials: 'include', headers, body: JSON.stringify({ context: { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00', hl: 'en', gl: 'GB' } }, browseId: bid }) })
+    const data = await r.json()
+    walk(data)
+    if (data && data.error) return { error: (data.error.message || 'browse error') + ' (signed=' + !!auth + ')', items: [] }
+    return { items: out, renderers: {} }
+  })().catch(e => ({ error: String(e.message || e), items: [] }))
 }.toString() + ')("history")'
 
 const probeLoginScript = '(' + function () {
@@ -824,4 +833,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.12 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.13 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

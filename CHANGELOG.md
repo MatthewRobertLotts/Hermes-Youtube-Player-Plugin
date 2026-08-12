@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.13
+
+- **History auth fix:** the browse-API call now signs with the **SAPISID hash** (same auth header YouTube's own JS sends) plus client/visitor headers, so it's accepted as logged-in instead of rejected.
+
+
 ## v3.12
 
 - **History fixed via YouTube browse API**: history items load through YouTube's own `/youtubei/v1/browse` endpoint (same origin, logged in) instead of the empty initial-page shell — the data that DevTools showed arriving in a separate AJAX call is now read directly.
