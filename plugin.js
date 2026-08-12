@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.13-sapisid'
+const VERSION = 'v3.14-livecfg'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -93,14 +93,23 @@ const scrapeFeedScript = '(' + function (feedKey) {
   const sign = async () => { const sapisid = getCookie('SAPISID') || getCookie('__Secure-3PAPISID') || getCookie('__Secure-3PSID') || getCookie('SID') || ''; if (!sapisid) return ''; const time = Math.floor(Date.now()/1000); const origin = location.origin || 'https://www.youtube.com'; const hash = await sha1hex(time+' '+sapisid+' '+origin); return 'SAPISIDHASH '+time+'_'+hash }
   return (async () => {
     const auth = await sign()
-    const headers = { 'Content-Type': 'application/json', 'X-YouTube-Client-Name': '1', 'X-YouTube-Client-Version': '2.20240101.00.00' }
+    // Use the page's OWN live API key + client version (ytcfg) — YouTube rejects stale/hardcoded
+    // client versions on signed requests ("invalid argument").
+    const cfg = (window.ytcfg && typeof window.ytcfg.get === 'function') ? window.ytcfg : ({ data: window.ytcfg })
+    const getCfg = k => (cfg.get ? cfg.get(k) : (cfg.data ? cfg.data[k] : undefined)) || ''
+    const apiKey = getCfg('INNERTUBE_API_KEY') || 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+    const clientVersion = getCfg('INNERTUBE_CLIENT_VERSION') || '2.20241212.01.00'
+    const clientName = getCfg('INNERTUBE_CLIENT_NAME') || 'WEB'
+    const hl = getCfg('HL') || 'en'
+    const gl = getCfg('GL') || 'GB'
+    const headers = { 'Content-Type': 'application/json', 'X-YouTube-Client-Name': '1', 'X-YouTube-Client-Version': clientVersion }
     if (auth) headers['Authorization'] = auth
-    const visitor = getCookie('VISITOR_INFO1_LIVE')
+    const visitor = getCookie('VISITOR_INFO1_LIVE') || getCfg('VISITOR_DATA')
     if (visitor) headers['X-Goog-Visitor-Id'] = visitor
-    const r = await fetch('/youtubei/v1/browse?prettyPrint=false', { method: 'POST', credentials: 'include', headers, body: JSON.stringify({ context: { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00', hl: 'en', gl: 'GB' } }, browseId: bid }) })
+    const r = await fetch('/youtubei/v1/browse?key=' + encodeURIComponent(apiKey), { method: 'POST', credentials: 'include', headers, body: JSON.stringify({ context: { client: { clientName, clientVersion, hl, gl } }, browseId: bid }) })
     const data = await r.json()
     walk(data)
-    if (data && data.error) return { error: (data.error.message || 'browse error') + ' (signed=' + !!auth + ')', items: [] }
+    if (data && data.error) return { error: (data.error.message || 'browse error') + ' (signed=' + !!auth + ' cv=' + clientVersion + ')', items: [] }
     return { items: out, renderers: {} }
   })().catch(e => ({ error: String(e.message || e), items: [] }))
 }.toString() + ')("history")'
@@ -833,4 +842,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.13 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.14 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }

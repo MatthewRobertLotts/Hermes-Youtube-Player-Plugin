@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.14
+
+- **History fix:** browse request now uses the page's **live API key + client version** from `ytcfg` (not a hardcoded one YouTube rejects as stale), plus the `?key=` param.
+
+
 ## v3.13
 
 - **History auth fix:** the browse-API call now signs with the **SAPISID hash** (same auth header YouTube's own JS sends) plus client/visitor headers, so it's accepted as logged-in instead of rejected.
