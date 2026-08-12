@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.7
+
+- Fixed account feeds: **Subscriptions / Watch Later / History** now **auto-load on selection** (no blank Search needed), Watch Later/History parse their playlist renderers, and signed-out use prompts to sign in instead of silently failing.
+
+
 ## v3.6
 
 - Added **account integration**: detects your signed-in account (👤 shows the account name). When signed in, **History** pulls your real YouTube watch history, and the video-type dropdown gains **Subscriptions** and **Watch Later** from your account. Signed-out History falls back to local viewing history.
