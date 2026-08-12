@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.2
+
+- Added **Volume** slider on the timeline row — sets YouTube player + video-element volume.
+
+
 ## v3.1
 
 - Added **History** search mode — watched items recorded newest-first, persisted in localStorage (last 50), replayable from the dropdown.

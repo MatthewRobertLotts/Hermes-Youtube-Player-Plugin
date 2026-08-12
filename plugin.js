@@ -2,7 +2,7 @@ import { cn } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.1-history'
+const VERSION = 'v3.2-volume'
 const DEFAULT_QUERY = 'king boomer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
@@ -158,6 +158,11 @@ function driveScript(action, value) {
   return '(' + function (payload) {
     const p = document.getElementById('movie_player')
     const v = document.querySelector('video')
+    if (payload.action === 'volume') {
+      const vol = Math.max(0, Math.min(1, Number(payload.value) || 0))
+      if (v) { v.volume = vol; v.muted = vol === 0 }
+      try { if (p && typeof p.setVolume === 'function') p.setVolume(vol * 100) } catch (e) {}
+    }
     if (payload.action === 'loop') {
       // off | once | inf
       if (window.__hermesLoopOnce && v) { try { v.removeEventListener('ended', window.__hermesLoopOnce) } catch (e) {} }
@@ -351,6 +356,7 @@ function YouTubeFloat() {
   const captionRef = useRef('off')
   const [captions, setCaptions] = useState([])
   const [progress, setProgress] = useState({ current: 0, duration: 0, paused: true })
+  const [volume, setVolume] = useState(1)
   const [streams, setStreams] = useState([])
   const [native, setNative] = useState(false)
   const searchRef = useRef(null)
@@ -638,7 +644,13 @@ function YouTubeFloat() {
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-search', ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
-      jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
+      jsxs('div', { className: 'mb-1 flex items-center gap-2', children: [
+        jsx(Timeline, { current: progress.current, duration: progress.duration, onSeek: v => { setProgress({ ...progress, current: v }); void runCommand('seek', v) }, videoId }),
+        jsxs('label', { className: 'flex shrink-0 items-center gap-1 text-[11px] text-(--ui-text-tertiary)', title: 'Volume', children: [
+          jsx('span', { children: '🔊' }),
+          jsx('input', { 'aria-label': 'Volume', className: 'h-1 w-16 cursor-pointer accent-(--ui-accent)', disabled: !videoId, max: 1, min: 0, onChange: e => { const v = Number(e.currentTarget.value); setVolume(v); void runCommand('volume', v) }, step: 0.05, type: 'range', value: volume })
+        ] })
+      ] }),
       jsxs('div', { className: 'flex flex-wrap items-center justify-center gap-2', children: [
               jsxs('div', { className: 'flex min-w-0 flex-1 items-center justify-start gap-1.5', children: [
                         jsx(StaticSelect, { current: playerSize, label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }),
@@ -667,4 +679,4 @@ function YouTubeFloat() {
   ] })
 }
 
-export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.1 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
+export default { id: 'youtube-float', name: 'YouTube Float', description: 'Floating YouTube player pane showing a native full-size <video> injected into the YouTube session webview.', register(ctx) { ctx.register({ id: 'player', area: 'panes', title: 'YouTube v3.2 ★', data: { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }, render: () => jsx(YouTubeFloat, {}) }) } }
