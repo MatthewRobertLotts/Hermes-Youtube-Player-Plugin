@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
-  <img src="https://img.shields.io/badge/Current-v3.18-blue" alt="Current v3.18">
+  <img src="https://img.shields.io/badge/Current-v3.19-blue" alt="Current v3.19">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
 </p>
 
@@ -103,10 +103,10 @@ Playlists — search, open a playlist, and chain through every episode:
 2. From a PowerShell prompt in the repo, run the bundled installer:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.18.ps1
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.19.ps1
 ```
 
-3. **Fully quit and reopen Hermes Desktop.** The pane title should show **YouTube v3.18 ★**.
+3. **Fully quit and reopen Hermes Desktop.** The pane title should show **YouTube v3.19 ★**.
 
 > The installer writes the plugin into both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`.
 

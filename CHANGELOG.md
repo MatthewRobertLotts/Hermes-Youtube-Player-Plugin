@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.19
+
+- Covered the History pane's raw browser flash with an opaque "Loading your YouTube history…" overlay while it scrapes.
+
+
 ## v3.18
 
 - **History rebuilt:** opens a real visible/interactive history webview in the player area (the same trust surface as the login pane), scrapes the rendered rows, then locks back down — this sidesteps YouTube's anti-bot stub served to the hidden 1px webview.
