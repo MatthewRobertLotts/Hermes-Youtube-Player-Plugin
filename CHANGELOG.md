@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.39
+- Removed persisted resume handoff; resume is now volatile in-memory only to prevent video reload loops.
+- Made the status chip pulse as a whole and switched closed state to stronger traditional red.
+- Placed the floating close `×` next to the built-in collapse button instead of pushing controls apart.
+
 ## v3.38
 - Made the status-bar chip stateful: green Open, red Closed, and shows Floating/Docked mode when open.
 - Added a pulsing status dot to the chip for clearer state guidance.

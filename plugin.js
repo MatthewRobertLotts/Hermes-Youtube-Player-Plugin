@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.38-status-chip-floating-close'
+const VERSION = 'v3.39-volatile-resume-chip-polish'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -413,7 +413,7 @@ const playlistFillScript = '(' + function () {
 
 function YouTubeFloat({ pane = false } = {}) {
   const prefs = useMemo(readPrefs, [])
-  const resume = prefs.resume && Date.now() - prefs.resume.at < SWITCH_RESUME_MS ? prefs.resume : (livePlayerState && Date.now() - livePlayerState.at < SWITCH_RESUME_MS ? livePlayerState : null)
+  const resume = livePlayerState && Date.now() - livePlayerState.at < SWITCH_RESUME_MS ? livePlayerState : null
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState(PLAYER_SIZES[prefs.playerSize] ? prefs.playerSize : 'large')
@@ -527,8 +527,7 @@ function YouTubeFloat({ pane = false } = {}) {
 
   useEffect(() => {
     const currentPrefs = readPrefs()
-    const existing = currentPrefs.resume
-    savePrefs({ playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption, resume: existing && Date.now() - existing.at < SWITCH_RESUME_MS ? existing : null })
+    savePrefs({ playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption })
   }, [playerSize, placement, volume, loopMode, quality, caption])
 
   useEffect(() => {
@@ -546,7 +545,9 @@ function YouTubeFloat({ pane = false } = {}) {
       button.textContent = '×'
       button.className = 'rounded px-1 text-xs text-(--ui-text-quaternary) transition-colors hover:text-(--ui-text-primary)'
       button.onclick = event => { event.preventDefault(); event.stopPropagation(); if (closePlayerPane) closePlayerPane() }
-      header.appendChild(button)
+      const chevron = header.querySelector('button[data-floating-no-drag]')
+      if (chevron && chevron.parentNode) chevron.parentNode.insertBefore(button, chevron.nextSibling)
+      else header.appendChild(button)
     }
     const observer = new MutationObserver(mount)
     observer.observe(document.body, { childList: true, subtree: true })
@@ -603,7 +604,7 @@ function YouTubeFloat({ pane = false } = {}) {
         if (handoff && handoff.videoId === videoId) {
           if (handoff.paused) await webview.executeJavaScript(driveScript('pause'), true)
           resumeRef.current = null
-          savePrefs({ ...readPrefs(), resume: null })
+          if (livePlayerState?.videoId === videoId) livePlayerState = null
         }
         const r = await webview.executeJavaScript(readPlayerScript, true)
         if (r) {
@@ -929,7 +930,8 @@ function YouTubeFloat({ pane = false } = {}) {
   const togglePlacement = () => {
     const v = placement === 'docked' ? 'floating' : 'docked'
     const snap = videoId ? { at: Date.now(), current: progress.current || 0, paused: progress.paused, playlist, videoId } : null
-    if (snap?.videoId) { livePlayerState = snap; savePrefs({ ...readPrefs(), placement: v, resume: snap }) }
+    if (snap?.videoId) livePlayerState = snap
+    savePrefs({ ...readPrefs(), placement: v })
     setPlacement(v)
     if (setPlayerPlacement) setPlayerPlacement(v)
   }
@@ -1006,14 +1008,14 @@ function YouTubeStatusChip() {
   const label = '▶ YouTube ' + (state.open ? 'Open' : 'Closed') + (state.open ? ' (' + mode + ')' : '')
   return jsxs('button', {
     className: cn(
-      'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] transition-colors hover:bg-(--chrome-action-hover)',
-      state.open ? 'text-emerald-400 hover:text-emerald-300' : 'text-red-400 hover:text-red-300'
+      'inline-flex h-full animate-pulse items-center gap-1 rounded-none px-1.5 text-[0.6875rem] font-medium transition-colors hover:bg-(--chrome-action-hover)',
+      state.open ? 'text-green-500 hover:text-green-400' : 'text-red-600 hover:text-red-500'
     ),
     onClick: () => { if (setPlayerOpen) setPlayerOpen(!playerOpenState) },
     title: state.open ? 'YouTube player is open in ' + mode + ' mode — click to close' : 'YouTube player is closed — click to open',
     type: 'button',
     children: [
-      jsx('span', { className: cn('size-1.5 rounded-full', state.open ? 'animate-pulse bg-emerald-400' : 'animate-pulse bg-red-400') }),
+      jsx('span', { className: cn('size-1.5 rounded-full', state.open ? 'bg-green-500' : 'bg-red-600') }),
       jsx('span', { children: label })
     ]
   })
@@ -1040,7 +1042,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.38 ★',
+        title: 'YouTube v3.39 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
