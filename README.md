@@ -1,7 +1,7 @@
 <h1 align="center">Hermes YouTube Player Plugin</h1>
 
 <p align="center">
-  A native-style floating YouTube player for <strong>Hermes Desktop</strong> — watch, search, chain Shorts, and play whole playlists without ever leaving your coding workspace.
+  The definitive native YouTube player for <strong>Hermes Desktop</strong>: dock it, float it, search YouTube, play signed-in feeds, chain playlists, resume across layout switches, and control playback without leaving your workspace.
 </p>
 
 <p align="center">
@@ -12,118 +12,172 @@
 </p>
 
 <p align="center">
-  <img src="assets/feature-video.png" alt="Real YouTube playback" width="680">
+  <img src="assets/feature-video.png" alt="Hermes YouTube Player Plugin playing a real YouTube watch page inside a native Hermes media pane" width="680">
 </p>
 
 ---
 
 ## Demo
 
-The player in action — 26 seconds:
+26 seconds of the player doing the thing:
 
 <p align="center">
-  <img src="assets/demo.gif" alt="Hermes YouTube Player Plugin demo" width="520">
+  <img src="assets/demo.gif" alt="Demo of Hermes YouTube Player Plugin searching, playing, and controlling YouTube inside Hermes Desktop" width="520">
 </p>
 
 ---
 
-## What it is
+## What this is
 
-A floating desktop pane that brings YouTube straight into Hermes Desktop. It runs YouTube's own real player (not a hacky custom `<video>`), keeps all the transport controls you expect, and adds smart **Videos / Shorts / Playlists** search so you can watch, queue, and binge without tabbing away from your work.
+This is not a toy embed and it is not a browser tab with a YouTube page thrown into it.
+
+It is a native Hermes Desktop media player that uses YouTube's real watch-page player where that matters, then wraps it in Hermes-native controls, panes, status chips, persistence, search, account feeds, and dock/floating lifecycle management.
+
+If you want YouTube inside Hermes without losing your workspace, fighting browser chrome, or rebuilding a player from broken scraped streams, this is the one.
 
 ---
 
-## Features
+## Why this is hard
 
-A closer look at what's really under the hood (all backed by the live `plugin.js`):
+YouTube inside an Electron desktop plugin is easy until you try to make it good.
 
-### 🎬 Real YouTube player
-Uses YouTube's own watch-page webview and player API. Because it's YouTube's **real** player — not a repackaged custom `<video>` — playback is full-fidelity with none of the "black frame / audio only" problems that plague scraped-stream players.
+- Normal embeds fail or throw player configuration errors.
+- Scraped direct streams can play audio with black video.
+- YouTube's page chrome fights your UI.
+- Search results, Shorts, playlists, signed-in feeds, captions, and quality controls all come from different YouTube surfaces.
+- Hermes panes have their own lifecycle: docked, floating, closed, reopened, moved, remounted.
+- A media player must survive all of that without hijacking chat typing, duplicating panes, losing state, or randomly autoplaying on app reopen.
 
-### ⌨️ Full transport controls
-Everything you need mid-watch, all in one row:
-- **`Prev` / `Next`** — previous / next item (respects Shorts & playlist context)
-- **`-10s` / `+10s`** — fine-grained scene skip
-- **Play / Pause** and a responsive scrubbing **timeline** with live time/duration
+This plugin does the boring hard work: real YouTube playback, native Hermes controls, safe persistence, signed-in account support, fast pin/unpin resume, and single-active-pane behavior.
 
-### ⚙️ Playback quality
-On-the-fly **Quality** selection via YouTube's own quality engine — Auto / 144p / 240p / 360p / 480p / 720p / 1080p — applied directly to the live player.
+---
 
-### 💬 Subtitles & captions
-**Subs** control with on/off and automatic caption fallback (built-in + ASR-tracked caption sources), injected as a real `<track>` so they render inside the video.
+## Current feature set
 
-### 🔁 Loop — off / once / infinite
-Three-mode loop with a proper `ended` listener: play once and stop, or loop the clip forever. No drift, no stuck repeats.
+### Native Hermes integration
 
-### 📺 Search modes: Videos, Shorts, Playlists
-Pick a mode, type, and search. Results come straight from YouTube's own data — accurate thumbnails, durations, badges and playlist counts.
+- Docked Hermes pane.
+- Floating Hermes pane.
+- One-click pin/unpin beside the timeline.
+- Single active player instance: no duplicate docked/floating copies.
+- `/youtube` route and sidebar entry.
+- Command palette opener.
+- Status-bar chip with open/closed and docked/floating state.
+- Safe close/reopen behavior from docked tab, floating header, and status chip.
 
-### 🕘 Watch history
-A **History** mode in the same dropdown shows everything you've played, newest first, persisted across restarts (your last 50 items). Click any row to replay it.
+### Real YouTube playback
 
-### ⏩ Shorts chaining
-Open a Short and the next one plays automatically. **Drift detection** reads the live player's video id and snaps you back if YouTube auto-switches to something you didn't ask for; pausing never advances.
+- Uses YouTube's own watch-page player in a persistent webview partition.
+- Plugin-owned transport controls: Prev, Next, -10s, +10s, Play/Pause.
+- Dominant scrub timeline with live time/duration.
+- Volume popover.
+- Quality dropdown powered by YouTube's available quality levels.
+- Subtitle/caption control using YouTube's caption tracks.
+- Loop modes: off, once, infinite.
+- OS media controls via Media Session.
+- No global keyboard shortcuts that steal Space/J/K/L/arrow keys from Hermes chat.
 
-### ▶️ Playlist autostart & playthrough
-Click a playlist to load its full episode list, then it **autoplays the first item** and **rolls through to the end** — with an autostart fallback that reloads the proven `/watch?v=<id>&list=…&autoplay=1` path so playback never stalls on a cued-but-unstarted player.
+### Search, queues, and feeds
 
-### 📐 Window presets
-Fitted **Large / Medium / Small** pane presets that keep the video at a clean 16:9, so the same player fits your layout whether it's a side panel or the main stage.
+- Search YouTube videos.
+- Search Shorts.
+- Search playlists.
+- Open playlist rows into an autoplaying queue.
+- Shorts chaining with drift protection.
+- Signed-in account mode.
+- Signed-in feeds: History, Subscriptions, Watch Later, Your Playlists.
+- Account webview stays locked down outside explicit account/login mode.
 
-### 🤖 Ask about what's playing *(roadmap)*
-The player knows exactly what's on screen — title, channel, timestamp. A planned upgrade lets Hermes **recognize what you're playing and answer questions about it**, right from the pane.
+### Persistence that does not surprise you
+
+- Persists safe preferences: size, volume, loop, quality, captions, placement.
+- Persists YouTube session through the shared webview partition.
+- Pin/unpin and pane remounts resume the current video quickly.
+- Does not persist current video as a long-term app-reopen autoplay trap.
+
+### Layout and polish
+
+- Mini / Small / Medium / Large size modes.
+- Pin button left of the timeline, volume right of the timeline.
+- Docked and floating close controls use Hermes chrome where possible.
+- Status chip tells you whether the player is open, closed, docked, or floating.
+- Raw YouTube account/feed panes are covered while scraping so the plugin stays a media player, not a random browser window.
 
 ---
 
 ## Screenshots
 
-Search for and play a normal-length video:
+### Native Hermes media pane
+
+Real YouTube playback inside a Hermes-native player shell: timeline, transport controls, account entry point, quality, captions, loop, dock/floating placement, and status-aware chrome.
 
 <p align="center">
-  <img src="assets/feature-video.png" alt="Video search + playback — Akira (1988) Trailer" width="620">
+  <img src="assets/feature-video.png" alt="Native Hermes YouTube player pane with real YouTube playback and plugin-owned transport controls" width="620">
 </p>
 
-Shorts search &amp; chaining — find a tutorial, play it, let the next one roll:
+### Shorts without browser chaos
+
+Shorts search and playback stay inside the same controlled media pane. The plugin chains Shorts deliberately and guards against YouTube drifting into unrelated long-form autoplay.
 
 <p align="center">
-  <img src="assets/feature-shorts.png" alt="Shorts search + play — Hermes Agent Tutorial" width="620">
+  <img src="assets/feature-shorts.png" alt="Shorts search and playback inside the Hermes YouTube Player Plugin" width="620">
 </p>
 
-Playlists — search, open a playlist, and chain through every episode:
+### Playlists as queues
+
+Playlist results open into a playable queue, autoplay the first item, and roll through the list without dumping you into a full YouTube browser page.
 
 <p align="center">
-  <img src="assets/feature-playlists.png" alt="Playlist hero — The Ricky Gervais Show" width="620">
+  <img src="assets/feature-playlists.png" alt="Playlist queue playback inside the Hermes YouTube Player Plugin" width="620">
 </p>
 
 ---
 
 ## Install
 
-1. Clone (or download) the repo.
-2. From a PowerShell prompt in the repo, run the bundled installer:
+1. Clone or download this repo.
+2. From PowerShell in the repo folder, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.40.ps1
 ```
 
-3. **Fully quit and reopen Hermes Desktop.** The pane title should show **YouTube v3.21 ★**.
+3. Fully quit and reopen Hermes Desktop.
+4. Confirm the pane title shows **YouTube v3.40 ★**.
 
-> The installer writes the plugin into both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`.
+The installer writes to both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`, plus profile plugin folders when present.
 
 ---
 
-## What's next
+## Roadmap
 
-- **Aware playback** — let Hermes recognize the video / channel / timestamp and answer questions about what's on screen.
-- More playback-session and queue controls.
-- Tighter integration with Hermes chat for "continue the episode", "skip to scene", style commands.
+Before the dashboard:
+
+- Better responsive scaling for very wide docked panes.
+- Persist the signed-in account label across player remounts so the Account button reflects the real logged-in session immediately.
+
+Next major feature:
+
+- Replace the current `/youtube` route with a proper native YouTube dashboard: account-aware sections, feed shortcuts, recent queues, and player actions — not just a giant duplicate player.
+
+---
 
 ## Development
 
-- `plugin.js` — the entire plugin (ES module, loaded directly by Hermes Desktop).
+- `plugin.js` — the runtime plugin, loaded directly by Hermes Desktop.
 - `install-youtube-float.ps1` — current installer.
-- `docs/versions/` / `CHANGELOG.md` — release history.
-- Independent player webview (`persist:hermes-youtube-float-player`) + a hidden search webview; controls drive YouTube's own JS player API.
+- `docs/versions/` and `CHANGELOG.md` — release history.
+- Runtime imports stay limited to `@hermes/plugin-sdk`, `react`, and `react/jsx-runtime`.
+
+Checks used before release:
+
+```bash
+node --check plugin.js
+```
+
+A small runtime import harness is also used during development to catch module-scope plugin load failures that syntax checks miss.
+
+---
 
 ## License
 
