@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.49
+- Hard-rolled docked sizing back to the fixed preset path after responsive experiments made smaller docked panes worse.
+- Removed all `dockResponsive`/cover/object-fit experiment code.
+- Keeps account label persistence from v3.41.
+
 ## v3.48
 - Rolled back the broken v3.46/v3.47 docked cover-fill experiment.
 - Restored the last stable centered docked scaling while preserving v3.41 account-label persistence.
