@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.39-volatile-resume-chip-polish'
+const VERSION = 'v3.40-freeze-resume-chip-controls'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -433,7 +433,8 @@ function YouTubeFloat({ pane = false } = {}) {
   const [captions, setCaptions] = useState([])
   const [progress, setProgress] = useState({ current: resume?.current || 0, duration: 0, paused: resume ? resume.paused !== false : true })
   const resumeRef = useRef(resume)
-  const resumeStart = resume?.videoId ? resume.current || 0 : 0
+  const resumeStartRef = useRef(resume?.videoId ? resume.current || 0 : 0)
+  const resumeStart = resumeStartRef.current
   const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
   const [volumeOpen, setVolumeOpen] = useState(false)
   const [loginPane, setLoginPane] = useState(false)
@@ -546,14 +547,27 @@ function YouTubeFloat({ pane = false } = {}) {
       button.className = 'rounded px-1 text-xs text-(--ui-text-quaternary) transition-colors hover:text-(--ui-text-primary)'
       button.onclick = event => { event.preventDefault(); event.stopPropagation(); if (closePlayerPane) closePlayerPane() }
       const chevron = header.querySelector('button[data-floating-no-drag]')
-      if (chevron && chevron.parentNode) chevron.parentNode.insertBefore(button, chevron.nextSibling)
-      else header.appendChild(button)
+      const controls = document.createElement('span')
+      controls.dataset.youtubeFloatControls = '1'
+      controls.setAttribute('data-floating-no-drag', '')
+      controls.style.marginLeft = 'auto'
+      controls.style.display = 'inline-flex'
+      controls.style.alignItems = 'center'
+      controls.style.gap = '4px'
+      if (chevron && chevron.parentNode) {
+        chevron.parentNode.insertBefore(controls, chevron)
+        controls.appendChild(chevron)
+        controls.appendChild(button)
+      } else {
+        controls.appendChild(button)
+        header.appendChild(controls)
+      }
     }
     const observer = new MutationObserver(mount)
     observer.observe(document.body, { childList: true, subtree: true })
     const timer = window.setTimeout(mount, 0)
     mount()
-    return () => { observer.disconnect(); window.clearTimeout(timer); if (button && button.parentNode) button.parentNode.removeChild(button) }
+    return () => { observer.disconnect(); window.clearTimeout(timer); const controls = document.querySelector('[data-youtube-float-controls]'); if (controls) controls.remove() }
   }, [pane, placement])
 
 
@@ -1007,15 +1021,13 @@ function YouTubeStatusChip() {
   const mode = state.placement === 'floating' ? 'Floating' : 'Docked'
   const label = '▶ YouTube ' + (state.open ? 'Open' : 'Closed') + (state.open ? ' (' + mode + ')' : '')
   return jsxs('button', {
-    className: cn(
-      'inline-flex h-full animate-pulse items-center gap-1 rounded-none px-1.5 text-[0.6875rem] font-medium transition-colors hover:bg-(--chrome-action-hover)',
-      state.open ? 'text-green-500 hover:text-green-400' : 'text-red-600 hover:text-red-500'
-    ),
+    className: 'inline-flex h-full animate-pulse items-center gap-1 rounded-none px-1.5 text-[0.6875rem] font-medium transition-colors hover:bg-(--chrome-action-hover)',
+    style: { color: state.open ? '#22c55e' : '#dc2626' },
     onClick: () => { if (setPlayerOpen) setPlayerOpen(!playerOpenState) },
     title: state.open ? 'YouTube player is open in ' + mode + ' mode — click to close' : 'YouTube player is closed — click to open',
     type: 'button',
     children: [
-      jsx('span', { className: cn('size-1.5 rounded-full', state.open ? 'bg-green-500' : 'bg-red-600') }),
+      jsx('span', { className: 'size-1.5 rounded-full', style: { backgroundColor: state.open ? '#22c55e' : '#dc2626' } }),
       jsx('span', { children: label })
     ]
   })
@@ -1042,7 +1054,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.39 ★',
+        title: 'YouTube v3.40 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

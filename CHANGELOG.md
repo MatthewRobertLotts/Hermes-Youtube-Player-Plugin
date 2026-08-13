@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.40
+- Fixed reload loops by freezing `resumeStart` at mount so progress updates cannot change the webview `src`.
+- Forced status-chip colours with inline green/red styles instead of dynamic utility classes.
+- Grouped the floating collapse arrow and close `×` together on the right side of the floating header.
+
 ## v3.39
 - Removed persisted resume handoff; resume is now volatile in-memory only to prevent video reload loops.
 - Made the status chip pulse as a whole and switched closed state to stronger traditional red.
