@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.48
+- Rolled back the broken v3.46/v3.47 docked cover-fill experiment.
+- Restored the last stable centered docked scaling while preserving v3.41 account-label persistence.
+- Research note: CSS `contain` produces bars, CSS `cover` crops, and `object-fit` does not apply to iframes/webviews; next real attempt should explicitly size YouTube's internal player instead of cropping the webview.
+
 ## v3.47
 - Fixed v3.46 docked render failure by declaring `dockResponsive` before effects read it.
 - Keeps the controlled docked cover-fill experiment from v3.46.
