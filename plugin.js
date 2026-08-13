@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.42-wider-docked-video'
+const VERSION = 'v3.43-css-docked-scale'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -480,7 +480,6 @@ function YouTubeFloat({ pane = false } = {}) {
   const historyPaneRef = useRef(null)
   const playlistsPaneRef = useRef(null)
   const rootRef = useRef(null)
-  const [paneWidth, setPaneWidth] = useState(0)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
   const historyRef = useRef(history)
@@ -540,17 +539,6 @@ function YouTubeFloat({ pane = false } = {}) {
     const currentPrefs = readPrefs()
     savePrefs({ account: currentPrefs.account, playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption })
   }, [playerSize, placement, volume, loopMode, quality, caption])
-
-  useEffect(() => {
-    const el = rootRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(entries => {
-      const width = entries[0]?.contentRect?.width || 0
-      if (width > 0) setPaneWidth(Math.round(width))
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
 
   useEffect(() => {
     if (!pane || placement !== 'floating') return undefined
@@ -963,13 +951,11 @@ function YouTubeFloat({ pane = false } = {}) {
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
   const mini = playerSize === 'mini'
   const dockResponsive = pane && placement === 'docked' && !mini
-  const dockWidth = paneWidth || Number.parseInt(cfg().width, 10) || 760
-  const dockPlayerPx = dockResponsive ? Math.min(960, Math.max(236, Math.round(dockWidth * 9 / 16))) : Number.parseInt(cfg().player, 10)
   const playerBoxStyle = dockResponsive
-    ? { height: dockPlayerPx + 'px', maxHeight: '78vh' }
+    ? { height: 'min(78vh, calc((100vw - 420px) * 0.5625))', minHeight: '360px' }
     : { height: cfg().player }
   const playerWebviewStyle = dockResponsive
-    ? { left: '50%', right: 'auto', width: 'min(100%, ' + Math.round(dockPlayerPx * 16 / 9) + 'px)', transform: 'translateX(-50%)' }
+    ? { left: '50%', right: 'auto', width: 'min(100%, calc(78vh * 1.7778), calc(100vw - 420px))', transform: 'translateX(-50%)' }
     : undefined
   const playerWebviewClass = dockResponsive ? 'absolute inset-y-0 h-full bg-black' : 'absolute inset-0 h-full w-full bg-black'
   const lockedPlayerWebviewClass = dockResponsive ? 'pointer-events-none absolute inset-y-0 h-full bg-black' : 'pointer-events-none absolute inset-0 h-full w-full bg-black'
@@ -1086,7 +1072,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.42 ★',
+        title: 'YouTube v3.43 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

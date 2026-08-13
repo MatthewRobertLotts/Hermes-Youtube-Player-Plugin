@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.43
+- Replaced the docked width observer with pure CSS viewport-based scaling so the player can grow much larger at max dock width.
+- Keeps centered video and black/cutoff guard from v3.41.
+
 ## v3.42
 - Increased the docked responsive player cap from 720px to 960px and max pane height from 72vh to 78vh.
 - Keeps the v3.41 centered scaling guard while allowing much larger docked video display.
