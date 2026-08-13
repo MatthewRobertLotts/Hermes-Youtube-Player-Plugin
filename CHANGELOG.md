@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.44
+- Shrink-wrapped docked video around a 16:9 box instead of reserving a giant black full-width stage.
+- Keeps max-width and centering from v3.43 while reducing unused black vertical space.
+
 ## v3.43
 - Replaced the docked width observer with pure CSS viewport-based scaling so the player can grow much larger at max dock width.
 - Keeps centered video and black/cutoff guard from v3.41.
