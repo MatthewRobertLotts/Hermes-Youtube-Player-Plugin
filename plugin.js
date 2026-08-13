@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.41-docked-scale-account-cache'
+const VERSION = 'v3.42-wider-docked-video'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -964,9 +964,9 @@ function YouTubeFloat({ pane = false } = {}) {
   const mini = playerSize === 'mini'
   const dockResponsive = pane && placement === 'docked' && !mini
   const dockWidth = paneWidth || Number.parseInt(cfg().width, 10) || 760
-  const dockPlayerPx = dockResponsive ? Math.min(720, Math.max(236, Math.round(dockWidth * 9 / 16))) : Number.parseInt(cfg().player, 10)
+  const dockPlayerPx = dockResponsive ? Math.min(960, Math.max(236, Math.round(dockWidth * 9 / 16))) : Number.parseInt(cfg().player, 10)
   const playerBoxStyle = dockResponsive
-    ? { height: dockPlayerPx + 'px', maxHeight: '72vh' }
+    ? { height: dockPlayerPx + 'px', maxHeight: '78vh' }
     : { height: cfg().player }
   const playerWebviewStyle = dockResponsive
     ? { left: '50%', right: 'auto', width: 'min(100%, ' + Math.round(dockPlayerPx * 16 / 9) + 'px)', transform: 'translateX(-50%)' }
@@ -1086,7 +1086,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.41 ★',
+        title: 'YouTube v3.42 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.42
+- Increased the docked responsive player cap from 720px to 960px and max pane height from 72vh to 78vh.
+- Keeps the v3.41 centered scaling guard while allowing much larger docked video display.
+
 ## v3.41
 - Made docked player height responsive to the actual pane width and centered the video area to avoid huge-pane black/cutoff scaling failures.
 - Cached signed-in account state/name in plugin prefs and module memory so Account stays signed-in across pin/unpin, close/reopen, and pane remounts.
