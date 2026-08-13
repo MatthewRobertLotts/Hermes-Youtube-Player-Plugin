@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.45-revert-docked-shrinkwrap'
+const VERSION = 'v3.46-docked-cover-fill'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -223,6 +223,20 @@ const stripScript = '(' + function () {
   }
   return { ok: true }
 }.toString() + ')()'
+
+function fitScript(mode) {
+  return '(' + function (payload) {
+    const cover = payload.mode === 'cover'
+    const css = `
+      video,.html5-main-video{width:100vw!important;height:100vh!important;left:0!important;top:0!important;object-fit:${cover ? 'cover' : 'contain'}!important}
+      #movie_player,.html5-video-player,.html5-video-container{width:100vw!important;height:100vh!important;max-height:100vh!important;overflow:hidden!important;background:#000!important}
+    `
+    let st = document.getElementById('hermes-yt-fit')
+    if (!st) { st = document.createElement('style'); st.id = 'hermes-yt-fit'; document.documentElement.appendChild(st) }
+    st.textContent = css
+    return { ok: true, mode: cover ? 'cover' : 'contain' }
+  }.toString() + ')(' + JSON.stringify({ mode }) + ')'
+}
 
 function driveScript(action, value) {
   return '(' + function (payload) {
@@ -620,6 +634,7 @@ function YouTubeFloat({ pane = false } = {}) {
       if (loginPaneRef.current) return
       try {
         await webview.executeJavaScript(stripScript, true)
+        await webview.executeJavaScript(fitScript(dockResponsive ? 'cover' : 'contain'), true)
         await webview.executeJavaScript(driveScript('volume', volume), true)
         await webview.executeJavaScript(driveScript('loop', loopMode), true)
         await webview.executeJavaScript(driveScript('caption', captionRef.current), true)
@@ -658,7 +673,7 @@ function YouTubeFloat({ pane = false } = {}) {
     return () => { webview.removeEventListener('dom-ready', ready); window.clearTimeout(settle); if (retryTimer) window.clearInterval(retryTimer); if (failTimer) window.clearTimeout(failTimer) }
   // loginPane in deps: leaving the account pane back to the locked player must re-arm the strip
   // handler even when videoId is unchanged (see lock-down-after-login bug).
-  }, [videoId, loginPane])
+  }, [videoId, loginPane, dockResponsive])
 
   // History pane: when open, scrape the visible history webview's rendered rows and close back
   // to the locked player. Reuse scrapeSearchScript — the VISIBLE webview gets real ytInitialData.
@@ -954,11 +969,9 @@ function YouTubeFloat({ pane = false } = {}) {
   const playerBoxStyle = dockResponsive
     ? { height: 'min(78vh, calc((100vw - 420px) * 0.5625))', minHeight: '360px' }
     : { height: cfg().player }
-  const playerWebviewStyle = dockResponsive
-    ? { left: '50%', right: 'auto', width: 'min(100%, calc(78vh * 1.7778), calc(100vw - 420px))', transform: 'translateX(-50%)' }
-    : undefined
-  const playerWebviewClass = dockResponsive ? 'absolute inset-y-0 h-full bg-black' : 'absolute inset-0 h-full w-full bg-black'
-  const lockedPlayerWebviewClass = dockResponsive ? 'pointer-events-none absolute inset-y-0 h-full bg-black' : 'pointer-events-none absolute inset-0 h-full w-full bg-black'
+  const playerWebviewStyle = undefined
+  const playerWebviewClass = 'absolute inset-0 h-full w-full bg-black'
+  const lockedPlayerWebviewClass = 'pointer-events-none absolute inset-0 h-full w-full bg-black'
   const togglePlacement = () => {
     const v = placement === 'docked' ? 'floating' : 'docked'
     const snap = videoId ? { at: Date.now(), current: progress.current || 0, paused: progress.paused, playlist, videoId } : null
@@ -1072,7 +1085,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.45 ★',
+        title: 'YouTube v3.46 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

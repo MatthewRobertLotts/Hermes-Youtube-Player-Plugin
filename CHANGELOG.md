@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.46
+- Fills oversized docked playback with a controlled cover crop instead of unnatural side/moat bars.
+- Floating and normal modes stay `contain`; only docked oversized mode uses `cover`.
+- Restores full-width docked webview while hiding overflow inside the player.
+
 ## v3.45
 - Reverted the v3.44 shrink-wrap experiment because it replaced black side space with grey chrome without improving the player.
 - Restored the safer v3.43 centered black-stage docked scaling.
