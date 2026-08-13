@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.50
+- Caps the docked pane width with Hermes' native pane `maxWidth` support.
+- Leaves player CSS/scaling untouched after v3.46-v3.48 responsive experiments regressed layout.
+- Keeps account label persistence.
+
 ## v3.49
 - Hard-rolled docked sizing back to the fixed preset path after responsive experiments made smaller docked panes worse.
 - Removed all `dockResponsive`/cover/object-fit experiment code.

@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.49-rollback-docked-sizing'
+const VERSION = 'v3.50-cap-docked-width'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1059,7 +1059,7 @@ export default {
     const playerData = placement => placement === 'floating'
       ? { placement: 'floating', anchor: 'top-right', width: PLAYER_SIZES.large.width, height: PLAYER_SIZES.large.height }
       // ponytail: placement main forces a visible tab/header; tabWrap blocks Hermes' plugin-disable context Close.
-      : { placement: 'main', dock: { pane: 'workspace', pos: 'right' }, stripTools: closeTool, tabWrap: noPluginCloseMenu, width: '420px', minWidth: '360px' }
+      : { placement: 'main', dock: { pane: 'workspace', pos: 'right' }, stripTools: closeTool, tabWrap: noPluginCloseMenu, width: '420px', minWidth: '360px', maxWidth: '820px' }
     const playerId = placement => placement === 'floating' ? 'player-floating' : 'player-docked'
     const registerPlayer = placement => {
       if (disposePlayer) disposePlayer()
@@ -1067,7 +1067,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.49 ★',
+        title: 'YouTube v3.50 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
