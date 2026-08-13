@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.45
+- Reverted the v3.44 shrink-wrap experiment because it replaced black side space with grey chrome without improving the player.
+- Restored the safer v3.43 centered black-stage docked scaling.
+
 ## v3.44
 - Shrink-wrapped docked video around a 16:9 box instead of reserving a giant black full-width stage.
 - Keeps max-width and centering from v3.43 while reducing unused black vertical space.
