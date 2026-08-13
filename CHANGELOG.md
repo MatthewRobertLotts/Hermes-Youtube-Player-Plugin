@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.47
+- Fixed v3.46 docked render failure by declaring `dockResponsive` before effects read it.
+- Keeps the controlled docked cover-fill experiment from v3.46.
+
 ## v3.46
 - Fills oversized docked playback with a controlled cover crop instead of unnatural side/moat bars.
 - Floating and normal modes stay `contain`; only docked oversized mode uses `cover`.

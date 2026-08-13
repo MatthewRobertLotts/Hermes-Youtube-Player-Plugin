@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.46-docked-cover-fill'
+const VERSION = 'v3.47-fix-cover-init-order'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -434,6 +434,9 @@ function YouTubeFloat({ pane = false } = {}) {
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState(PLAYER_SIZES[prefs.playerSize] ? prefs.playerSize : 'large')
   const [placement, setPlacement] = useState(prefs.placement === 'floating' ? 'floating' : 'docked')
+  const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
+  const mini = playerSize === 'mini'
+  const dockResponsive = pane && placement === 'docked' && !mini
   const [videoId, setVideoId] = useState(resume?.videoId || null)
   const [playlist, setPlaylist] = useState(resume?.playlist || null)
   const [queueMode, setQueueMode] = useState('search')
@@ -963,9 +966,6 @@ function YouTubeFloat({ pane = false } = {}) {
     value: '__title',
     children: [jsx('option', { value: '__title', children: label }, '__title'), ...children]
   })
-  const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
-  const mini = playerSize === 'mini'
-  const dockResponsive = pane && placement === 'docked' && !mini
   const playerBoxStyle = dockResponsive
     ? { height: 'min(78vh, calc((100vw - 420px) * 0.5625))', minHeight: '360px' }
     : { height: cfg().player }
@@ -1085,7 +1085,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.46 ★',
+        title: 'YouTube v3.47 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
