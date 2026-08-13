@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.40-freeze-resume-chip-controls'
+const VERSION = 'v3.41-docked-scale-account-cache'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -23,6 +23,7 @@ let closePlayerPane = null
 let playerOpenState = true
 let playerPlacementState = 'docked'
 let livePlayerState = null
+let liveAccountState = null
 const statusListeners = new Set()
 const emitPlayerStatus = () => statusListeners.forEach(fn => { try { fn({ open: playerOpenState, placement: playerPlacementState }) } catch (e) {} })
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
@@ -413,6 +414,7 @@ const playlistFillScript = '(' + function () {
 
 function YouTubeFloat({ pane = false } = {}) {
   const prefs = useMemo(readPrefs, [])
+  const accountPrefs = liveAccountState || prefs.account || {}
   const resume = livePlayerState && Date.now() - livePlayerState.at < SWITCH_RESUME_MS ? livePlayerState : null
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
@@ -442,8 +444,8 @@ function YouTubeFloat({ pane = false } = {}) {
   loginPaneRef.current = loginPane
   const [historyPane, setHistoryPane] = useState(false)
   const [playlistsPane, setPlaylistsPane] = useState(false)
-  const [signedIn, setSignedIn] = useState(false)
-  const [accountName, setAccountName] = useState('')
+  const [signedIn, setSignedIn] = useState(accountPrefs.signedIn === true)
+  const [accountName, setAccountName] = useState(accountPrefs.name || '')
   const signedInRef = useRef(signedIn)
   signedInRef.current = signedIn
   // Probe the persistent session webview for login state. Tries the player and search webviews
@@ -452,7 +454,14 @@ function YouTubeFloat({ pane = false } = {}) {
     for (const ref of [playerRef, searchRef]) {
       try {
         const r = await ref.current?.executeJavaScript(probeLoginScript, true)
-        if (r && typeof r.signedIn === 'boolean') { setSignedIn(r.signedIn); setAccountName(r.name || ''); return }
+        if (r && typeof r.signedIn === 'boolean') {
+          const account = { signedIn: r.signedIn === true, name: r.name || '' }
+          liveAccountState = account
+          savePrefs({ ...readPrefs(), account })
+          setSignedIn(account.signedIn)
+          setAccountName(account.name)
+          return
+        }
       } catch (e) {}
     }
   }
@@ -471,6 +480,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const historyPaneRef = useRef(null)
   const playlistsPaneRef = useRef(null)
   const rootRef = useRef(null)
+  const [paneWidth, setPaneWidth] = useState(0)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
   const historyRef = useRef(history)
@@ -528,8 +538,19 @@ function YouTubeFloat({ pane = false } = {}) {
 
   useEffect(() => {
     const currentPrefs = readPrefs()
-    savePrefs({ playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption })
+    savePrefs({ account: currentPrefs.account, playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption })
   }, [playerSize, placement, volume, loopMode, quality, caption])
+
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect?.width || 0
+      if (width > 0) setPaneWidth(Math.round(width))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     if (!pane || placement !== 'floating') return undefined
@@ -941,6 +962,17 @@ function YouTubeFloat({ pane = false } = {}) {
   })
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
   const mini = playerSize === 'mini'
+  const dockResponsive = pane && placement === 'docked' && !mini
+  const dockWidth = paneWidth || Number.parseInt(cfg().width, 10) || 760
+  const dockPlayerPx = dockResponsive ? Math.min(720, Math.max(236, Math.round(dockWidth * 9 / 16))) : Number.parseInt(cfg().player, 10)
+  const playerBoxStyle = dockResponsive
+    ? { height: dockPlayerPx + 'px', maxHeight: '72vh' }
+    : { height: cfg().player }
+  const playerWebviewStyle = dockResponsive
+    ? { left: '50%', right: 'auto', width: 'min(100%, ' + Math.round(dockPlayerPx * 16 / 9) + 'px)', transform: 'translateX(-50%)' }
+    : undefined
+  const playerWebviewClass = dockResponsive ? 'absolute inset-y-0 h-full bg-black' : 'absolute inset-0 h-full w-full bg-black'
+  const lockedPlayerWebviewClass = dockResponsive ? 'pointer-events-none absolute inset-y-0 h-full bg-black' : 'pointer-events-none absolute inset-0 h-full w-full bg-black'
   const togglePlacement = () => {
     const v = placement === 'docked' ? 'floating' : 'docked'
     const snap = videoId ? { at: Date.now(), current: progress.current || 0, paused: progress.paused, playlist, videoId } : null
@@ -953,23 +985,23 @@ function YouTubeFloat({ pane = false } = {}) {
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
     jsx('div', {
       className: 'relative shrink-0 bg-black',
-      style: { height: cfg().player },
+      style: playerBoxStyle,
       children: playlistsPane
         ? jsxs('div', { className: 'absolute inset-0', children: [
-            jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playlistsPaneRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }),
+            jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playlistsPaneRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists), style: playerWebviewStyle }),
             jsx('div', { className: 'pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black px-3 text-center text-xs text-white/70', children: 'Loading your playlists…' })
           ] })
         : (historyPane
             ? jsxs('div', { className: 'absolute inset-0', children: [
-            jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: historyPaneRef, src: cacheBust(ACCOUNT_FEEDS.history) }),
+            jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: historyPaneRef, src: cacheBust(ACCOUNT_FEEDS.history), style: playerWebviewStyle }),
             // Keep the webview rendered (YouTube serves real data to a "visible" webview) but
             // cover it with an opaque loader so the raw browser flash never shows while loading.
             jsx('div', { className: 'pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black px-3 text-center text-xs text-white/70', children: 'Loading your YouTube history…' })
           ] })
         : (loginPane
-        ? jsx('webview', { className: 'absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com' })
+        ? jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com', style: playerWebviewStyle })
         : (videoId
-          ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: 'pointer-events-none absolute inset-0 h-full w-full bg-black', partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart) })
+          ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
@@ -1054,7 +1086,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.40 ★',
+        title: 'YouTube v3.41 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
-  <img src="https://img.shields.io/badge/Current-v3.40-blue" alt="Current v3.40">
+  <img src="https://img.shields.io/badge/Current-v3.41-blue" alt="Current v3.41">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
 </p>
 
@@ -139,7 +139,7 @@ Playlist results open into a playable queue, autoplay the first item, and roll t
 2. From PowerShell in the repo folder, run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.40.ps1
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.41.ps1
 ```
 
 3. Fully quit and reopen Hermes Desktop.
@@ -153,8 +153,8 @@ The installer writes to both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERP
 
 Before the dashboard:
 
-- Better responsive scaling for very wide docked panes.
-- Persist the signed-in account label across player remounts so the Account button reflects the real logged-in session immediately.
+- Better responsive scaling for very wide docked panes. *(shipped v3.41)*
+- Persist the signed-in account label across player remounts so the Account button reflects the real logged-in session immediately. *(shipped v3.41)*
 
 Next major feature:
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.41
+- Made docked player height responsive to the actual pane width and centered the video area to avoid huge-pane black/cutoff scaling failures.
+- Cached signed-in account state/name in plugin prefs and module memory so Account stays signed-in across pin/unpin, close/reopen, and pane remounts.
+
 ## v3.40
 - Fixed reload loops by freezing `resumeStart` at mount so progress updates cannot change the webview `src`.
 - Forced status-chip colours with inline green/red styles instead of dynamic utility classes.
