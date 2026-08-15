@@ -53,7 +53,9 @@ for (const file of ['install-youtube-float.ps1', `install-youtube-float-${versio
 
 const syntax = spawnSync('node', ['--check', path.join(root, 'plugin.js')], { encoding: 'utf8' });
 if (syntax.status !== 0) fail(`node --check failed\n${syntax.stderr}`);
-const tests = spawnSync('node', ['--test', 'tests/*.test.mjs'], { cwd: root, encoding: 'utf8' });
+const testFiles = fs.readdirSync(path.join(root, 'tests')).filter(f => f.endsWith('.test.mjs')).map(f => path.join('tests', f));
+if (!testFiles.length) fail('no Node test files found');
+const tests = spawnSync('node', ['--test', ...testFiles], { cwd: root, encoding: 'utf8' });
 if (tests.status !== 0) fail(`node --test failed\n${tests.stdout}\n${tests.stderr}`);
 
 console.log(`check-release: ${version} ok`);
