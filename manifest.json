@@ -1,7 +1,7 @@
 {
   "id": "youtube-float",
   "name": "Hermes YouTube Player",
-  "version": "v3.109",
+  "version": "v3.109.1",
   "main": "plugin.js",
   "routes": [
     "/youtube"

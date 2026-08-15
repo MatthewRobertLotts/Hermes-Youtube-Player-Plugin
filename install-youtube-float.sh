@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
-SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SOURCE_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
 SOURCE="$SOURCE_DIR/plugin.js"
-MARKER="v3.109"
+MARKER="v3.109.1"
 
 if [ ! -f "$SOURCE" ]; then
   echo "plugin.js not found next to installer" >&2
@@ -43,9 +43,9 @@ printf '%s
   fi
   written="$written
  - $target"
-  printf 'Installed YouTube Float v3.109 to %s
+  printf 'Installed YouTube Float v3.109.1 to %s
 ' "$target"
 done
 
-printf 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.109 ★.
+printf 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.109.1 ★.
 '
