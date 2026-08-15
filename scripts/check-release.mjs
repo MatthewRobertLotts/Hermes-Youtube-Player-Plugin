@@ -25,6 +25,7 @@ const required = [
   `install-youtube-float-${version}.sh`,
   'src/youtube-core.mjs',
   'tests/youtube-core.test.mjs',
+  'SECURITY.md',
 ];
 for (const file of required) if (!exists(file)) fail(`missing ${file}`);
 
@@ -36,6 +37,22 @@ if (plugin.includes(`${version}-test`) || plugin.includes(`${version}-youtube`))
 if (!plugin.includes("id: 'youtube-float'")) fail('plugin id missing/changed in plugin.js');
 if (!plugin.includes("path: '/youtube'")) fail('/youtube route missing from plugin.js');
 if (!plugin.includes(`YouTube ${version} ★`)) fail('pane title does not match version');
+
+const forbiddenSecurityPatterns = [
+  /document\.cookie/,
+  /getAllCookies\s*\(/,
+  /cookies\.get/,
+  /sessionStorage\.(?:getItem|setItem)\s*\(/,
+  /localStorage\.getItem\(['"][^'"]*(?:cookie|token|password|credential)[^'"]*['"]\)/i,
+  /navigator\.clipboard\.writeText\([^)]*(?:cookie|token|password|credential)/i,
+];
+for (const pattern of forbiddenSecurityPatterns) {
+  if (pattern.test(plugin)) fail(`forbidden security/privacy pattern in plugin.js: ${pattern}`);
+}
+const security = read('SECURITY.md');
+for (const needle of ['persistent Electron webview partition', 'does **not** directly handle YouTube login credentials', 'should not store, print, copy, or intentionally expose', 'executeJavaScript']) {
+  if (!security.includes(needle)) fail(`SECURITY.md missing ${needle}`);
+}
 
 const readme = read('README.md');
 for (const needle of [`Current-${version}-blue`, `install-youtube-float-${version}.ps1`, `install-youtube-float-${version}.sh`, `YouTube ${version} ★`, 'actions/workflows/check.yml/badge.svg']) {

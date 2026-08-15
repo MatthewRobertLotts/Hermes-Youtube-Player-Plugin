@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
-  <img src="https://img.shields.io/badge/Current-v3.112-blue" alt="Current v3.112">
+  <img src="https://img.shields.io/badge/Current-v3.113-blue" alt="Current v3.113">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
   <img src="https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/actions/workflows/check.yml/badge.svg" alt="Check">
 </p>
@@ -144,7 +144,7 @@ Playlist results open into a playable queue, autoplay the first item, and roll t
 ### Windows PowerShell
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.112.ps1
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.113.ps1
 ```
 
 Writes to `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`, plus profile plugin folders when present.
@@ -152,14 +152,25 @@ Writes to `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\des
 ### macOS / Linux
 
 ```bash
-chmod +x ./install-youtube-float-v3.112.sh
-./install-youtube-float-v3.112.sh
+chmod +x ./install-youtube-float-v3.113.sh
+./install-youtube-float-v3.113.sh
 ```
 
 Writes to `~/.hermes/desktop-plugins`, `$HERMES_HOME/desktop-plugins` when set, macOS `~/Library/Application Support/hermes/desktop-plugins`, and profile plugin folders when present.
 
 3. Fully quit and reopen Hermes Desktop.
-4. Confirm the pane title shows **YouTube v3.112 ★**.
+4. Confirm the pane title shows **YouTube v3.113 ★**.
+
+---
+
+## Privacy and security
+
+- Uses a persistent YouTube webview session so signed-in shelves work.
+- Login happens inside YouTube; the plugin does not directly handle YouTube passwords.
+- Stores small local preferences and safe UI state only.
+- Does not intentionally store/copy cookies, auth tokens, passwords, or raw session data.
+- Debug diagnostics are off by default and redact sensitive-looking keys before copying.
+- See [`SECURITY.md`](SECURITY.md) for the full security/privacy model.
 
 ---
 

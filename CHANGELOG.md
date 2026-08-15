@@ -1,36 +1,41 @@
 # Changelog
 
-## v3.112
+## v3.113
+- Add `SECURITY.md` covering YouTube session behavior, stored data, `executeJavaScript`, external links, and diagnostics privacy.
+- Add README privacy/security section.
+- Add CI guard against obvious cookie/session/token dumping patterns.
+
+## v3.113
 - Add labelled YouTube compatibility-layer boundaries for account, search/dashboard, History, player, and playlist adapters.
 - Centralise plugin-context YouTube constants for video IDs, playlist IDs, webview partition, and History browse ID.
 - Add tests that lock the shared compatibility constants.
 
-## v3.112
+## v3.113
 - Add debug diagnostics mode, off by default.
 - Add Copy diagnostics action that redacts sensitive-looking keys and avoids cookies/tokens/session data.
 - Log major account, History, playlist, player-command, caption, and Media Session failures.
 
-## v3.112
+## v3.113
 - Fix CI test discovery inside the release consistency checker.
 - Keep Phase 3 Node tests running in GitHub Actions.
 
-## v3.112
+## v3.113
 - Add the first real automated tests using Node's built-in test runner.
 - Add testable YouTube URL, playlist/timestamp, dashboard-row, and queue helper coverage.
 - Run the tests in GitHub Actions and release consistency checks.
 
-## v3.112
+## v3.113
 - Fix ShellCheck warning in macOS/Linux installers.
-- Keep CI/release version checks consistent on `v3.112`.
+- Keep CI/release version checks consistent on `v3.113`.
 
-## v3.112
+## v3.113
 - Add GitHub Actions CI for push and pull request checks.
 - Add release consistency validation for plugin ID, route, version, manifest, README, changelog, and installers.
 - Validate Node syntax, Bash installer syntax, ShellCheck, and PowerShell installer syntax.
 
-## v3.112
+## v3.113
 - Lock the current product to one canonical release version.
-- Set `plugin.js` to plain `v3.112` with no descriptive suffix.
+- Set `plugin.js` to plain `v3.113` with no descriptive suffix.
 - Update README, changelog, installer filenames, installer verification markers, and release tag versioning to match.
 - Verify Windows, Linux, and macOS install paths as far as this Linux worker can test.
 
