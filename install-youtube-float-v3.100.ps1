@@ -17,9 +17,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v3.99-flat-top-signed-history') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v3.100-history-feed-fix') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v3.99 to:'
+Write-Host 'Installed YouTube Float v3.100 to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.99 ★.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.100 ★.'

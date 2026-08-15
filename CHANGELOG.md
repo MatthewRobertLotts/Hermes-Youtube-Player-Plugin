@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.100
+- Retry signed History feed loading.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.99
 - Flatten the top bar and restore signed History path.
 - Updates plugin source, installer, README, and version page.

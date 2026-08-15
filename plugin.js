@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.99-flat-top-signed-history'
+const VERSION = 'v3.100-history-feed-fix'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -601,6 +601,7 @@ function YouTubeFloat({ pane = false } = {}) {
   // Auto-probes login so the mode resolves correctly as soon as it's picked.
   const loadFeed = filter => {
     if (filter === 'recommended') { setQueueMode('search'); setResults([]); setStatus('Loading recommended videos…'); setSearchUrl(cacheBust('https://www.youtube.com/')); return }
+    if (filter === 'history') { showHistory(); return }
     if (filter === 'yourplaylists') {
       if (!signedInRef.current) { setResults([]); setStatus('Sign in first (Account button) to use Your Playlists'); return }
       setQueueMode('search'); setResults([]); setStatus('Loading Your Playlists…'); setPlaylistsPane(true); return
@@ -1002,6 +1003,7 @@ function YouTubeFloat({ pane = false } = {}) {
 
   const submit = event => {
     event.preventDefault()
+    if (filter === 'history') { showHistory(); return }
     const next = draft.trim()
     if (!next && !ACCOUNT_FEEDS[filter]) return
     // Account-bound modes (Subscriptions / Watch Later) need a signed-in session.
@@ -1214,7 +1216,7 @@ function YouTubeDashboard() {
             const rowItems = key === 'playlists'
               ? clean.filter(i => /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) || /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.list || '') || i.type === 'playlist').map(i => ({ ...i, id: (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) ? i.id : (i.list || i.id)), type: 'playlist' }))
               : (key === 'shorts' ? clean.filter(i => i.type === 'short').map(i => ({ ...i, type: 'short' })) : (key === 'history' ? clean.filter(i => i.type !== 'short') : clean))
-            if (rowItems.length) {
+            if (rowItems.length && !(key === 'history' && account.signedIn && rowItems.length < 2 && attempt < 10)) {
               liveDashboardRows[key] = rowItems
               emitPlayerStatus()
               return
@@ -1271,7 +1273,7 @@ function YouTubeDashboard() {
   ] }, title)
   return jsxs('div', { className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
-    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history) }),
+    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
@@ -1370,7 +1372,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.99 ★',
+        title: 'YouTube v3.100 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
