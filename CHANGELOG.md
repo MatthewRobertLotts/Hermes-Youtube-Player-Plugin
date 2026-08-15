@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.88
+- Test stacked top media controls.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.87
 - Compact the media-control top bar.
 - Updates plugin source, installer, README, and version page.
