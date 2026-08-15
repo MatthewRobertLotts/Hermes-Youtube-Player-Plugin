@@ -1,12 +1,18 @@
+## v3.130
+- Stable Player milestone: full release audit. No new player features, no redesign.
+- Restore missing CHANGELOG headings (v3.128/v3.127) so generated release notes are no longer fused; add a CI guard that fails on any changelog gap from v3.108 to the current version.
+
 ## v3.129
 - Add scoped focus-visible styles and `aria-label="Seek position"` for keyboard accessibility.
 - Reflow the dashboard (no redesign) so narrow Hermes windows stack the media panel and collapse the four-up stats/metrics to two columns instead of overflowing.
 - Require `docs/release-tests/v3.129-responsive-ux-accessibility.md` in release checks.
 
-ake persistent hidden dashboard webviews use a stable cache-busted source so re-renders and dock/float swaps no longer tear down and reload every YouTube shelf (network + session churn).
+## v3.128
+- Make persistent hidden dashboard webviews use a stable cache-busted source so re-renders and dock/float swaps no longer tear down and reload every YouTube shelf (network + session churn).
 - Add `PERFORMANCE.md` (profiling steps) and deterministic tests for the stable-source and bounded-timer contracts.
 
-ersist the playback queue and queue index across docked/floating swaps and close/reopen by mirroring them module-wide (video, position, volume, loop, captions, and quality already survived).
+## v3.127
+- Persist the playback queue and queue index across docked/floating swaps and close/reopen by mirroring them module-wide (video, position, volume, loop, captions, and quality already survived).
 - Harden placement registration so a pending pane is disposed before a new one is registered, preventing duplicate audio/decoders.
 
 ## v3.126

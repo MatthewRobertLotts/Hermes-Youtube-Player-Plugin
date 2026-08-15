@@ -85,6 +85,21 @@ if (!changelog.split('\n').slice(0, 5).includes(`## ${version}`)) fail('CHANGELO
 const changelogVersions = [...changelog.matchAll(/^## (v\d+\.\d+(?:\.\d+)?)$/gm)].map(m => m[1]);
 const duplicateChangelogVersions = changelogVersions.filter((v, i) => changelogVersions.indexOf(v) !== i);
 if (duplicateChangelogVersions.length) fail(`duplicate CHANGELOG versions: ${[...new Set(duplicateChangelogVersions)].join(', ')}`);
+// The changelog is the source of truth for release notes, so a deleted heading silently fuses one
+// version's notes into another. Require a contiguous descending integer run from the current
+// version down to v3.108 (the release-series floor) with no gaps.
+const floor = 108;
+const currentMinor = Number((version.match(/^v(\d+)\.(\d+)/) || [])[2]);
+if (!Number.isInteger(currentMinor)) fail('cannot derive changelog series from version');
+const present = new Set(changelogVersions.map(v => v.replace(/^v3\.(\d+)\.\d+$/, 'v3.$1')).filter(v => /^v3\.\d+$/.test(v)));
+const missing = [];
+for (let m = currentMinor; m >= floor; m -= 1) if (!present.has(`v3.${m}`)) missing.push(`v3.${m}`);
+if (missing.length) fail(`CHANGELOG gap: ${missing.join(', ')} — release notes would be fused/contaminated`);
+// Guard against a broken/mangled changelog body: if the current version's entry contains any
+// other version heading, its body is contaminated and would corrupt the generated release notes.
+const entryMatch = changelog.match(new RegExp(`^## ${version}\\n(?<body>.*?)(?=^## v\\d+\\.\\d+(?:\\.\\d+)?\\n|\\Z)`, 'ms'));
+if (!entryMatch || !entryMatch.groups.body.trim()) fail('CHANGELOG current entry is empty');
+if (/^## v\d+\.\d+(?:\.\d+)?$/m.test(entryMatch.groups.body)) fail('CHANGELOG current entry body contains another version heading (fused entries)');
 
 for (const file of ['install-youtube-float.ps1', `install-youtube-float-${version}.ps1`, 'install-youtube-float.sh', `install-youtube-float-${version}.sh`]) {
   const text = read(file);
