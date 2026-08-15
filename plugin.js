@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.65-soft-mask'
+const VERSION = 'v3.66-dashboard'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1111,6 +1111,65 @@ function YouTubeFloat({ pane = false } = {}) {
   ] })
 }
 
+
+function YouTubeDashboard() {
+  const prefs = readPrefs()
+  const history = (() => { try { return pluginStorage ? pluginStorage.get('history', []) : (JSON.parse(localStorage.getItem(HISTORY_KEY)) || []) } catch (e) { return [] } })()
+  const account = liveAccountState || prefs.account || {}
+  const [state, setState] = useState({ open: playerOpenState, placement: playerPlacementState })
+  useEffect(() => { statusListeners.add(setState); setState({ open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
+  const open = placement => { if (setPlayerPlacement) setPlayerPlacement(placement); else if (setPlayerOpen) setPlayerOpen(true) }
+  const card = 'rounded-xl border border-(--ui-border-muted) bg-(--ui-bg-elevated)/80 p-4 shadow-sm'
+  const button = 'rounded-lg border border-(--ui-border-muted) bg-(--ui-bg-editor) px-3 py-2 text-sm text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary)'
+  const recent = Array.isArray(history) ? history.slice(0, 8) : []
+  return jsxs('div', { className: 'h-full overflow-auto bg-(--ui-bg) p-6 text-(--ui-text-primary)', children: [
+    jsxs('div', { className: 'mx-auto flex max-w-5xl flex-col gap-5', children: [
+      jsxs('div', { className: 'flex flex-wrap items-end justify-between gap-3', children: [
+        jsxs('div', { children: [
+          jsx('div', { className: 'text-xs font-medium uppercase tracking-[0.2em] text-(--ui-accent)', children: 'Hermes YouTube' }),
+          jsx('h1', { className: 'mt-1 text-3xl font-semibold tracking-tight', children: 'YouTube Dashboard' }),
+          jsx('p', { className: 'mt-2 max-w-2xl text-sm text-(--ui-text-secondary)', children: 'Native controls for the locked YouTube player. Open the player, switch placement, and see recent videos.' })
+        ] }),
+        jsx('span', { className: cn('rounded-full px-3 py-1 text-xs font-medium', state.open ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'), children: state.open ? 'Open · ' + (state.placement === 'floating' ? 'Floating' : 'Docked') : 'Closed' })
+      ] }),
+      jsxs('div', { className: 'grid gap-4 md:grid-cols-3', children: [
+        jsxs('section', { className: card, children: [
+          jsx('h2', { className: 'text-sm font-semibold', children: 'Player' }),
+          jsx('p', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: state.open ? 'Player pane is active.' : 'Player pane is closed.' }),
+          jsxs('div', { className: 'mt-4 flex flex-wrap gap-2', children: [
+            jsx('button', { className: button, onClick: () => open('docked'), type: 'button', children: 'Open docked' }),
+            jsx('button', { className: button, onClick: () => open('floating'), type: 'button', children: 'Open floating' }),
+            jsx('button', { className: button, onClick: () => setPlayerOpen && setPlayerOpen(false), type: 'button', children: 'Close' })
+          ] })
+        ] }),
+        jsxs('section', { className: card, children: [
+          jsx('h2', { className: 'text-sm font-semibold', children: 'Account' }),
+          jsx('p', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: account.signedIn ? ('Signed in' + (account.name ? ' as ' + account.name : '')) : 'Not signed in yet.' }),
+          jsx('button', { className: cn(button, 'mt-4'), onClick: () => open('docked'), type: 'button', children: account.signedIn ? 'Manage in player' : 'Open player to sign in' })
+        ] }),
+        jsxs('section', { className: card, children: [
+          jsx('h2', { className: 'text-sm font-semibold', children: 'Now playing' }),
+          jsx('p', { className: 'mt-1 truncate text-xs text-(--ui-text-tertiary)', children: livePlayerState?.videoId ? ('Video ' + livePlayerState.videoId + ' · ' + fmt(livePlayerState.current || 0)) : 'Nothing captured yet.' }),
+          jsx('button', { className: cn(button, 'mt-4'), disabled: !livePlayerState?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show player' })
+        ] })
+      ] }),
+      jsxs('section', { className: card, children: [
+        jsxs('div', { className: 'flex items-center justify-between gap-3', children: [
+          jsx('h2', { className: 'text-sm font-semibold', children: 'Recent' }),
+          jsx('span', { className: 'text-xs text-(--ui-text-tertiary)', children: recent.length ? recent.length + ' saved' : 'Empty' })
+        ] }),
+        recent.length ? jsx('div', { className: 'mt-4 grid gap-2 sm:grid-cols-2', children: recent.map(item => jsxs('button', { className: 'flex min-w-0 items-center gap-3 rounded-lg border border-(--ui-border-muted) bg-(--ui-bg-editor)/70 p-2 text-left hover:border-(--ui-accent)', onClick: () => open(state.placement || 'docked'), title: item.title || item.id, type: 'button', children: [
+          jsx('img', { alt: '', className: 'h-12 w-20 rounded bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
+          jsxs('span', { className: 'min-w-0', children: [
+            jsx('span', { className: 'block truncate text-sm', children: item.title || item.id }),
+            jsx('span', { className: 'block text-xs text-(--ui-text-tertiary)', children: item.duration || 'YouTube video' })
+          ] })
+        ] }, item.id || item.title)) }) : jsx('p', { className: 'mt-4 text-sm text-(--ui-text-tertiary)', children: 'Search or play something in the player and it will appear here.' })
+      ] })
+    ] })
+  ] })
+}
+
 function YouTubeStatusChip() {
   const [state, setState] = useState({ open: playerOpenState, placement: playerPlacementState })
   useEffect(() => { statusListeners.add(setState); setState({ open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
@@ -1150,7 +1209,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.65 ★',
+        title: 'YouTube v3.66 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
@@ -1182,7 +1241,7 @@ export default {
         id: 'page',
         area: 'routes',
         data: { path: '/youtube' },
-        render: () => jsx(YouTubeFloat, {})
+        render: () => jsx(YouTubeDashboard, {})
       },
       {
         id: 'nav',

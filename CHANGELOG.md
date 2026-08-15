@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.66
+- Add the native YouTube dashboard route.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.65
 - Test the soft fullscreen veil.
 - Updates plugin source, installer, README, and version page.
