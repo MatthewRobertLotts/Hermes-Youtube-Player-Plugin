@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.107.1
+- Restore the polished README landing-page layout and screenshot sections.
+- Keep v3.107 current-version metadata.
+
 ## v3.107
 - Load History through YouTube browse API.
 - Updates plugin source, installer, README, and version page.
