@@ -23,6 +23,8 @@ const required = [
   `install-youtube-float-${version}.ps1`,
   'install-youtube-float.sh',
   `install-youtube-float-${version}.sh`,
+  'src/youtube-core.mjs',
+  'tests/youtube-core.test.mjs',
 ];
 for (const file of required) if (!exists(file)) fail(`missing ${file}`);
 
@@ -51,5 +53,7 @@ for (const file of ['install-youtube-float.ps1', `install-youtube-float-${versio
 
 const syntax = spawnSync('node', ['--check', path.join(root, 'plugin.js')], { encoding: 'utf8' });
 if (syntax.status !== 0) fail(`node --check failed\n${syntax.stderr}`);
+const tests = spawnSync('node', ['--test', 'tests/*.test.mjs'], { cwd: root, encoding: 'utf8' });
+if (tests.status !== 0) fail(`node --test failed\n${tests.stdout}\n${tests.stderr}`);
 
 console.log(`check-release: ${version} ok`);

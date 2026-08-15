@@ -17,6 +17,8 @@ jobs:
         run: sudo apt-get update && sudo -S -p '' apt-get install -y shellcheck
       - name: Release consistency checks
         run: node scripts/check-release.mjs
+      - name: Node tests
+        run: node --test tests/*.test.mjs
       - name: Bash installer syntax
         run: |
           version=$(node -p "require('./manifest.json').version")
