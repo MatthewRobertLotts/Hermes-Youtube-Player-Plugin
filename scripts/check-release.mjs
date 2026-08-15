@@ -26,6 +26,7 @@ const required = [
   'src/youtube-core.mjs',
   'tests/youtube-core.test.mjs',
   'SECURITY.md',
+  '.github/ISSUE_TEMPLATE/bug_report.yml',
 ];
 for (const file of required) if (!exists(file)) fail(`missing ${file}`);
 
@@ -52,6 +53,11 @@ for (const pattern of forbiddenSecurityPatterns) {
 const security = read('SECURITY.md');
 for (const needle of ['persistent Electron webview partition', 'does **not** directly handle YouTube login credentials', 'should not store, print, copy, or intentionally expose', 'executeJavaScript']) {
   if (!security.includes(needle)) fail(`SECURITY.md missing ${needle}`);
+}
+
+const issueTemplate = read('.github/ISSUE_TEMPLATE/bug_report.yml');
+for (const needle of ['Bug report', 'Plugin version', 'Diagnostics', 'Copy diagnostics']) {
+  if (!issueTemplate.includes(needle)) fail(`bug report template missing ${needle}`);
 }
 
 const readme = read('README.md');

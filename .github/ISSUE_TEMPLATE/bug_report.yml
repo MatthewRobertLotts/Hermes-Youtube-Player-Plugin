@@ -1,0 +1,58 @@
+name: Bug report
+about: Report a Hermes YouTube Player problem
+labels: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. If you can, enable **Debug**, reproduce the problem, then click **Copy diagnostics** and paste it below. Do not paste cookies, tokens, passwords, or private account data.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: Example: v3.116. The pane title shows this as `YouTube vX.Y ★`.
+      placeholder: v3.116
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did it happen?
+      options:
+        - Docked player
+        - Floating player
+        - /youtube dashboard
+        - Account/sign-in
+        - History
+        - Subscriptions
+        - Watch Later
+        - Shorts
+        - Playlists
+        - Installer/update
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open /youtube
+        2. Click ...
+        3. Expected ... but got ...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste output from Debug → Copy diagnostics if available. Remove anything private you manually added.
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra notes or screenshots
+    validations:
+      required: false

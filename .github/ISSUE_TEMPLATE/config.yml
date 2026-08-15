@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Latest release
+    url: https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/latest
+    about: Download the latest stable build before reporting an already-fixed bug.
