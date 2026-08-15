@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.104-youtube-rendered-history'
+const VERSION = 'v3.105-history-no-overwrite'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -794,7 +794,7 @@ function YouTubeFloat({ pane = false } = {}) {
       try {
         const res = await historyPaneRef.current?.executeJavaScript(scrapeSearchScript, true)
         if (cancelled) return
-        const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title && v.type !== 'short')
+        const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title && v.type !== 'short' && v.id !== livePlayerState?.videoId)
         if (clean.length) {
           liveDashboardRows.history = clean
           setResults(clean)
@@ -999,8 +999,9 @@ function YouTubeFloat({ pane = false } = {}) {
         const clean = found.filter(v => v?.id && v?.title)
         liveDashboardResults = clean
         const dashKey = searchUrl && /^https:\/\/www\.youtube\.com\/?[?&]/.test(searchUrl) ? 'recommended' : (filter === 'watchlater' ? 'watchlater' : (filter || 'videos'))
-        liveDashboardRows[dashKey] = clean
-        setResults(clean)
+        if (dashKey === 'history' && (liveDashboardRows.history || []).length) return
+        liveDashboardRows[dashKey] = dashKey === 'history' ? clean.filter(v => v.id !== livePlayerState?.videoId && v.type !== 'short') : clean
+        setResults(dashKey === 'history' ? liveDashboardRows.history : clean)
         setCurrentIndex(-1)
         if (clean[0]) setStatus('History — pick a result')
         else if (filter === 'history') { const pg = res && res.page ? ' | ' + (res.page.title || '?').slice(0, 40) + ' url=' + (res.page.url || '?').slice(0, 50) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''; setStatus('History empty — no items after wait' + pg) }
@@ -1234,7 +1235,8 @@ function YouTubeDashboard() {
               ? clean.filter(i => /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) || /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.list || '') || i.type === 'playlist').map(i => ({ ...i, id: (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) ? i.id : (i.list || i.id)), type: 'playlist' }))
               : (key === 'shorts' ? clean.filter(i => i.type === 'short').map(i => ({ ...i, type: 'short' })) : (key === 'history' ? clean.filter(i => i.type === 'video') : clean))
             if (rowItems.length) {
-              liveDashboardRows[key] = rowItems
+              if (key === 'history' && (liveDashboardRows.history || []).length) return
+              liveDashboardRows[key] = key === 'history' ? rowItems.filter(v => v.id !== livePlayerState?.videoId) : rowItems
               emitPlayerStatus()
               return
             }
@@ -1389,7 +1391,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.104 ★',
+        title: 'YouTube v3.105 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

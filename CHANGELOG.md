@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.105
+- Prevent stale History overwrites.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.104
 - Scrape rendered YouTube History links.
 - Updates plugin source, installer, README, and version page.
