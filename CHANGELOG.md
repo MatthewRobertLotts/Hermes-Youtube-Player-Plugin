@@ -1,8 +1,13 @@
 # Changelog
 
-## v3.108
+## v3.109
+- Add GitHub Actions CI for push and pull request checks.
+- Add release consistency validation for plugin ID, route, version, manifest, README, changelog, and installers.
+- Validate Node syntax, Bash installer syntax, ShellCheck, and PowerShell installer syntax.
+
+## v3.109
 - Lock the current product to one canonical release version.
-- Set `plugin.js` to plain `v3.108` with no descriptive suffix.
+- Set `plugin.js` to plain `v3.109` with no descriptive suffix.
 - Update README, changelog, installer filenames, installer verification markers, and release tag versioning to match.
 - Verify Windows, Linux, and macOS install paths as far as this Linux worker can test.
 

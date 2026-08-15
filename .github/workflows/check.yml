@@ -1,0 +1,34 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo -S -p '' apt-get install -y shellcheck
+      - name: Release consistency checks
+        run: node scripts/check-release.mjs
+      - name: Bash installer syntax
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          sh -n install-youtube-float.sh
+          sh -n "install-youtube-float-${version}.sh"
+      - name: ShellCheck installers
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          shellcheck install-youtube-float.sh "install-youtube-float-${version}.sh"
+      - name: PowerShell installer syntax
+        shell: pwsh
+        run: |
+          $version = (Get-Content -Raw manifest.json | ConvertFrom-Json).version
+          [scriptblock]::Create((Get-Content -Raw install-youtube-float.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw "install-youtube-float-$version.ps1")) | Out-Null
