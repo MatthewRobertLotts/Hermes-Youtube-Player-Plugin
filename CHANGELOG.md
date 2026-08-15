@@ -1,56 +1,61 @@
 # Changelog
 
-## v3.116
+## v3.117
+- Add `TROUBLESHOOTING.md` for install, update, shelf, fullscreen, and bug-report fixes.
+- Link troubleshooting from README and the bug report template.
+- Add CI checks so the troubleshooting guide stays present.
+
+## v3.117
 - Add a diagnostics-first GitHub bug report template.
 - Add issue-template CI checks so support intake does not regress.
 - Keep blank issues enabled without adding a speculative feature-request workflow.
 
-## v3.116
+## v3.117
 - Add in-plugin Check updates action backed by GitHub Releases.
 - Compare versions safely and open release notes only when a newer release exists.
 - Add tests for release-version comparison and update state.
 
-## v3.116
+## v3.117
 - Add release engineering checklist.
 - Add README release/update guidance.
 - Prepare the first stable GitHub Release package with CI-backed checks.
 
-## v3.116
+## v3.117
 - Add `SECURITY.md` covering YouTube session behavior, stored data, `executeJavaScript`, external links, and diagnostics privacy.
 - Add README privacy/security section.
 - Add CI guard against obvious cookie/session/token dumping patterns.
 
-## v3.116
+## v3.117
 - Add labelled YouTube compatibility-layer boundaries for account, search/dashboard, History, player, and playlist adapters.
 - Centralise plugin-context YouTube constants for video IDs, playlist IDs, webview partition, and History browse ID.
 - Add tests that lock the shared compatibility constants.
 
-## v3.116
+## v3.117
 - Add debug diagnostics mode, off by default.
 - Add Copy diagnostics action that redacts sensitive-looking keys and avoids cookies/tokens/session data.
 - Log major account, History, playlist, player-command, caption, and Media Session failures.
 
-## v3.116
+## v3.117
 - Fix CI test discovery inside the release consistency checker.
 - Keep Phase 3 Node tests running in GitHub Actions.
 
-## v3.116
+## v3.117
 - Add the first real automated tests using Node's built-in test runner.
 - Add testable YouTube URL, playlist/timestamp, dashboard-row, and queue helper coverage.
 - Run the tests in GitHub Actions and release consistency checks.
 
-## v3.116
+## v3.117
 - Fix ShellCheck warning in macOS/Linux installers.
-- Keep CI/release version checks consistent on `v3.116`.
+- Keep CI/release version checks consistent on `v3.117`.
 
-## v3.116
+## v3.117
 - Add GitHub Actions CI for push and pull request checks.
 - Add release consistency validation for plugin ID, route, version, manifest, README, changelog, and installers.
 - Validate Node syntax, Bash installer syntax, ShellCheck, and PowerShell installer syntax.
 
-## v3.116
+## v3.117
 - Lock the current product to one canonical release version.
-- Set `plugin.js` to plain `v3.116` with no descriptive suffix.
+- Set `plugin.js` to plain `v3.117` with no descriptive suffix.
 - Update README, changelog, installer filenames, installer verification markers, and release tag versioning to match.
 - Verify Windows, Linux, and macOS install paths as far as this Linux worker can test.
 
