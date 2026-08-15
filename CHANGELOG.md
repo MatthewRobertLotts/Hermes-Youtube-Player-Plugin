@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.99
+- Flatten the top bar and restore signed History path.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.98
 - Linkify descriptions and rename List to Source.
 - Updates plugin source, installer, README, and version page.

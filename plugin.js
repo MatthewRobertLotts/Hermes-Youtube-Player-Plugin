@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.98-description-links-source'
+const VERSION = 'v3.99-flat-top-signed-history'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -601,7 +601,6 @@ function YouTubeFloat({ pane = false } = {}) {
   // Auto-probes login so the mode resolves correctly as soon as it's picked.
   const loadFeed = filter => {
     if (filter === 'recommended') { setQueueMode('search'); setResults([]); setStatus('Loading recommended videos…'); setSearchUrl(cacheBust('https://www.youtube.com/')); return }
-    if (filter === 'history') { showHistory(); return }
     if (filter === 'yourplaylists') {
       if (!signedInRef.current) { setResults([]); setStatus('Sign in first (Account button) to use Your Playlists'); return }
       setQueueMode('search'); setResults([]); setStatus('Loading Your Playlists…'); setPlaylistsPane(true); return
@@ -1003,7 +1002,6 @@ function YouTubeFloat({ pane = false } = {}) {
 
   const submit = event => {
     event.preventDefault()
-    if (filter === 'history') { showHistory(); return }
     const next = draft.trim()
     if (!next && !ACCOUNT_FEEDS[filter]) return
     // Account-bound modes (Subscriptions / Watch Later) need a signed-in session.
@@ -1237,7 +1235,7 @@ function YouTubeDashboard() {
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
   const homeItems = rows.recommended || []
-  const rawHistory = (rows.history || []).length ? rows.history : localRecent
+  const rawHistory = (rows.history || []).length ? rows.history : (account.signedIn ? [] : localRecent)
   const recommended = homeItems.filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
   const recent = rawHistory.filter(x => x.type !== 'short').slice(0, 18)
   const subscriptions = (rows.subscriptions || []).slice(0, 18)
@@ -1248,7 +1246,7 @@ function YouTubeDashboard() {
   const nowChannel = current?.channel || 'Unknown channel'
   const nowDescription = current?.description || 'Description will appear when the video page exposes it.'
   const nowViews = current?.views ? Number(current.views).toLocaleString() : '—'
-  const DASH_BORDER = 'var(--ui-scrollbar-thumb, #075c45)'
+  const DASH_BORDER = 'transparent'
   const btn = 'rounded-full border bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
   const metric = (label, value) => jsxs('div', { className: 'rounded-xl bg-white/[0.055] px-3 py-2', children: [jsx('div', { className: 'text-lg font-semibold leading-none', children: value }), jsx('div', { className: 'mt-0.5 text-[10px] text-(--ui-text-tertiary)', children: label })] })
   const infoBox = (label, value) => jsxs('div', { className: 'min-w-0 rounded-xl bg-white/[0.055] px-3 py-2', style: { border: '1px solid ' + DASH_BORDER }, children: [jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: label }), jsx('div', { className: 'mt-1 truncate text-sm font-semibold', children: value })] })
@@ -1372,7 +1370,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.98 ★',
+        title: 'YouTube v3.99 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
