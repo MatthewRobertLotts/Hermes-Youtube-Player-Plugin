@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.114'
+const VERSION = 'v3.115'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -63,6 +63,16 @@ const diag = (system, event, data) => {
   diagnosticLog = [{ at: new Date().toISOString(), version: VERSION, system, event, data: scrubDiag(data) }, ...diagnosticLog].slice(0, DIAG_MAX)
 }
 const diagnosticPayload = () => JSON.stringify({ version: VERSION, platform: typeof navigator !== 'undefined' ? navigator.platform : 'unknown', userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown', entries: diagnosticLog }, null, 2)
+const RELEASES_LATEST_URL = 'https://api.github.com/repos/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/latest'
+const versionParts = v => String(v || '').replace(/^v/, '').split('.').map(n => Number(n) || 0)
+const compareVersions = (a, b) => {
+  const aa = versionParts(a), bb = versionParts(b)
+  for (let i = 0; i < Math.max(aa.length, bb.length); i++) {
+    const d = (aa[i] || 0) - (bb[i] || 0)
+    if (d) return d > 0 ? 1 : -1
+  }
+  return 0
+}
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
 const savePrefs = prefs => { try { pluginStorage ? pluginStorage.set('prefs', prefs) : localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
 const PLAYER_SIZES = {
@@ -601,6 +611,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
   const [volumeOpen, setVolumeOpen] = useState(false)
   const [debugMode, setDebugMode] = useState(prefs.debug === true)
+  const [updateBusy, setUpdateBusy] = useState(false)
   const [localFullscreen, setLocalFullscreen] = useState(false)
   const [fullscreenBusy, setFullscreenBusy] = useState(false)
   const [loginPane, setLoginPane] = useState(false)
@@ -1185,6 +1196,31 @@ function YouTubeFloat({ pane = false } = {}) {
     const text = diagnosticPayload()
     try { await navigator.clipboard?.writeText(text); setStatus('Diagnostics copied — no cookies/tokens included') } catch (e) { diag('diagnostics', 'copy failed', { message: e?.message }); setStatus('Diagnostics ready: copy failed, browser denied clipboard') }
   }
+  const checkForUpdates = async () => {
+    if (updateBusy) return
+    setUpdateBusy(true)
+    setStatus('Checking GitHub Releases…')
+    try {
+      const res = await fetch(RELEASES_LATEST_URL, { headers: { accept: 'application/vnd.github+json' } })
+      if (!res.ok) throw new Error('GitHub returned ' + res.status)
+      const release = await res.json()
+      const latest = release.tag_name || release.name || ''
+      if (!latest) throw new Error('No release version found')
+      if (compareVersions(latest, VERSION) > 0) {
+        setStatus('Update available: ' + latest + ' — opening release notes')
+        diag('updates', 'available', { current: VERSION, latest })
+        try { window.open(release.html_url || 'https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/latest', '_blank', 'noopener,noreferrer') } catch (e) { diag('updates', 'open failed', { message: e?.message }) }
+      } else {
+        setStatus('Up to date: ' + VERSION)
+        diag('updates', 'current', { current: VERSION, latest })
+      }
+    } catch (e) {
+      setStatus('Update check failed — try GitHub Releases')
+      diag('updates', 'check failed', { message: e?.message })
+    } finally {
+      setUpdateBusy(false)
+    }
+  }
   const StaticSelect = ({ children, current, disabled, label, onChange, title, width = 68 }) => jsx('select', {
     className: 'h-6 min-w-0 cursor-pointer rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs text-(--ui-text-secondary) disabled:opacity-50',
     style: { width, maxWidth: width },
@@ -1276,6 +1312,7 @@ function YouTubeFloat({ pane = false } = {}) {
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => { const v = e.currentTarget.value; setFilter(v); if (ACCOUNT_FEEDS[v] || v === 'history') loadFeed(v) }, value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
       jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' }),
+      jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary) disabled:opacity-50', disabled: updateBusy, onClick: checkForUpdates, title: 'Check GitHub Releases for updates', type: 'button', children: updateBusy ? 'Checking…' : 'Check updates' }),
       jsx('button', { className: cn('shrink-0 rounded-md border px-2.5 py-1.5 text-xs', debugMode ? 'border-(--ui-accent) bg-(--ui-accent)/15 text-(--ui-accent)' : 'border-(--ui-border-muted) bg-(--ui-bg-editor) text-(--ui-text-secondary)'), onClick: () => setDebugMode(v => !v), title: 'Toggle diagnostic logging', type: 'button', children: debugMode ? 'Debug on' : 'Debug' }),
       debugMode ? jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: copyDiagnostics, title: 'Copy diagnostics without cookies or tokens', type: 'button', children: 'Copy diagnostics' }) : null,
       jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: () => { setLoginPane(p => !p); setVolumeOpen(false) }, title: loginPane ? 'Done — back to the locked player' : signedIn ? ('Signed in' + (accountName ? ' as ' + accountName : '')) : 'Sign in to your YouTube account', type: 'button', children: loginPane ? '✓ Done' : (signedIn ? (accountName ? '👤 ' + accountName.slice(0, 12) : '👤 Signed in') : 'Account') })
@@ -1484,7 +1521,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.114 ★',
+        title: 'YouTube v3.115 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

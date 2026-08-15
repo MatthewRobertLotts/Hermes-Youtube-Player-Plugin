@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { YOUTUBE_COMPAT, isShortUrl, nextQueueItem, normaliseDashboardRow, playlistIdFrom, startSecondsFrom, videoIdFrom, watchUrl } from '../src/youtube-core.mjs';
+import { YOUTUBE_COMPAT, compareVersions, isShortUrl, nextQueueItem, normaliseDashboardRow, playlistIdFrom, startSecondsFrom, updateState, videoIdFrom, watchUrl } from '../src/youtube-core.mjs';
 
 const id = 'dQw4w9WgXcQ';
 
@@ -61,4 +61,14 @@ test('compatibility constants document YouTube boundaries', () => {
   assert.equal(YOUTUBE_COMPAT.webviewPartition, 'persist:hermes-youtube-float-player');
   assert.equal(new RegExp(YOUTUBE_COMPAT.playlistIdPattern).test('PLabc123'), true);
   assert.equal(YOUTUBE_COMPAT.trustedHosts.includes('youtu.be'), true);
+});
+
+
+test('compares release versions and update state', () => {
+  assert.equal(compareVersions('v3.115', 'v3.114'), 1);
+  assert.equal(compareVersions('v3.114.1', 'v3.114'), 1);
+  assert.equal(compareVersions('v3.114', 'v3.114.0'), 0);
+  assert.equal(compareVersions('v3.113', 'v3.114'), -1);
+  assert.deepEqual(updateState('v3.114', { tag_name: 'v3.115', html_url: 'https://example.test/release' }), { current: 'v3.114', latest: 'v3.115', state: 'available', url: 'https://example.test/release' });
+  assert.deepEqual(updateState('v3.115', { tag_name: 'v3.115' }), { current: 'v3.115', latest: 'v3.115', state: 'current', url: '' });
 });

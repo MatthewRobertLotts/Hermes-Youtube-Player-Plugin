@@ -72,3 +72,29 @@ export function nextQueueItem({ list, index, queueMode, playlistId }) {
   const nextIndex = items.indexOf(next);
   return { next, playlist: queueMode === 'playlist' ? playlistId : next.list, index: nextIndex };
 }
+
+
+export function versionParts(version) {
+  return String(version || '').replace(/^v/, '').split('.').map(n => Number(n) || 0);
+}
+
+export function compareVersions(a, b) {
+  const aa = versionParts(a);
+  const bb = versionParts(b);
+  for (let i = 0; i < Math.max(aa.length, bb.length); i += 1) {
+    const diff = (aa[i] || 0) - (bb[i] || 0);
+    if (diff) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+export function updateState(current, latestRelease) {
+  const latest = latestRelease?.tag_name || latestRelease?.name || '';
+  if (!latest) return { current, latest: '', state: 'unknown', url: '' };
+  return {
+    current,
+    latest,
+    state: compareVersions(latest, current) > 0 ? 'available' : 'current',
+    url: latestRelease.html_url || '',
+  };
+}
