@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.85
+- Restore signed History filtering.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.84
 - Test the local History source.
 - Updates plugin source, installer, README, and version page.
