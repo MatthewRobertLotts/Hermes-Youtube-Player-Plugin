@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.71
+- Test the YouTube-home dashboard layout.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.70
 - Stabilize dashboard account toggling.
 - Updates plugin source, installer, README, and version page.
