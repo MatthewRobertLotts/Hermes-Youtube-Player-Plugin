@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.55
+- Test the embed fullscreen path.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.54
 - Add fullscreen overlay handling.
 - Updates plugin source, installer, README, and version page.

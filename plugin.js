@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.54-true-fullscreen-fill'
+const VERSION = 'v3.55-embed-fullscreen'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -70,6 +70,15 @@ function watchUrl(videoId, playlistId, startAt = 0) {
   if (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(videoId)) return 'https://www.youtube.com/playlist?list=' + encodeURIComponent(videoId) + '&autoplay=1' + (start > 1 ? '&t=' + start + 's' : '')
   const base = 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' + (start > 1 ? '&t=' + start + 's' : '')
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
+}
+
+function embedUrl(videoId, playlistId, startAt = 0) {
+  if (!videoId) return 'about:blank'
+  const start = Math.max(0, Math.floor(Number(startAt) || 0))
+  let url = 'https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&enablejsapi=1'
+  if (start > 1) url += '&start=' + start
+  if (playlistId) url += '&list=' + encodeURIComponent(playlistId)
+  return url
 }
 const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
 // Signed-in feeds (only meaningful when the player partition is logged in).
@@ -946,7 +955,10 @@ function YouTubeFloat({ pane = false } = {}) {
     return () => ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach(a => navigator.mediaSession.setActionHandler(a, null))
   }, [progress.paused, results, currentIndex])
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
-  const toggleFullscreen = () => setLocalFullscreen(v => !v)
+  const toggleFullscreen = () => {
+    resumeStartRef.current = progress.current || 0
+    setLocalFullscreen(v => !v)
+  }
   const clickPlayerOverlay = () => {
     if (!videoId) return
     if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current)
@@ -1007,7 +1019,7 @@ function YouTubeFloat({ pane = false } = {}) {
         ? jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com', style: playerWebviewStyle })
         : (videoId
           ? jsxs('div', { className: 'absolute inset-0', children: [
-              jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
+              jsx('webview', { key: videoId + (loginPane ? 'L' : '') + (localFullscreen ? 'F' : 'W'), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: localFullscreen ? embedUrl(videoId, playlist, resumeStart) : watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
               jsx('button', { 'aria-label': 'Player click zone: click to play or pause, double-click for fullscreen', className: 'absolute inset-0 z-10 cursor-pointer bg-transparent', onClick: clickPlayerOverlay, onDoubleClick: doubleClickPlayerOverlay, title: 'Click: play/pause. Double-click: fullscreen. Esc exits fullscreen.', type: 'button' })
             ] })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
@@ -1094,7 +1106,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.54 ★',
+        title: 'YouTube v3.55 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
