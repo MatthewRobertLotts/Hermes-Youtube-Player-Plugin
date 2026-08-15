@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.54
+- Add fullscreen overlay handling.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.53
 - Add fullscreen restore handling.
 - Updates plugin source, installer, README, and version page.

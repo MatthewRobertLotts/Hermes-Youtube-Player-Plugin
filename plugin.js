@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.53-centered-fullscreen'
+const VERSION = 'v3.54-true-fullscreen-fill'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -972,7 +972,7 @@ function YouTubeFloat({ pane = false } = {}) {
     children: [jsx('option', { value: '__title', children: label }, '__title'), ...children]
   })
   const playerBoxStyle = { height: cfg().player }
-  const fullscreenWebviewStyle = { left: '50%', top: '50%', right: 'auto', bottom: 'auto', width: 'min(100vw, calc(100vh * 1.7778))', height: 'min(100vh, calc(100vw * 0.5625))', transform: 'translate(-50%, -50%)' }
+  const fullscreenWebviewStyle = { left: 0, top: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', transform: 'none' }
   const playerWebviewStyle = localFullscreen ? fullscreenWebviewStyle : undefined
   const playerWebviewClass = 'absolute inset-0 h-full w-full bg-black'
   const lockedPlayerWebviewClass = 'pointer-events-none absolute inset-0 h-full w-full bg-black'
@@ -986,7 +986,7 @@ function YouTubeFloat({ pane = false } = {}) {
   }
   const pinButton = jsx('button', { 'aria-label': placement === 'docked' ? 'Unpin player' : 'Pin player', className: 'grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)', onClick: togglePlacement, title: placement === 'docked' ? 'Pinned: click to float' : 'Floating: click to dock', type: 'button', children: placement === 'docked' ? '📌' : '📍' })
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
-    jsx('style', { children: '.hermes-yt-local-fullscreen{position:fixed!important;inset:0!important;z-index:2147483647!important;width:100vw!important;height:100vh!important;background:#000!important}' }),
+    jsx('style', { children: '.hermes-yt-local-fullscreen{position:fixed!important;inset:0!important;z-index:2147483647!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;background:#000!important}' }),
     jsx('div', {
       className: cn('relative shrink-0 bg-black', localFullscreen && 'hermes-yt-local-fullscreen'),
       ref: fullscreenBoxRef,
@@ -1094,7 +1094,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.53 ★',
+        title: 'YouTube v3.54 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
