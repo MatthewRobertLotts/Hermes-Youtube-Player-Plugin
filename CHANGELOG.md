@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.107.4
+- Add macOS/Linux shell installers alongside the Windows PowerShell installer.
+- Update README install instructions for Windows, macOS, and Linux.
+
 ## v3.107.3
 - Refresh README feature copy with stronger presentation and emojis.
 - Move shipped dashboard work out of the roadmap.

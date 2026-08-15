@@ -138,16 +138,27 @@ Playlist results open into a playable queue, autoplay the first item, and roll t
 ## Install
 
 1. Clone or download this repo.
-2. From PowerShell in the repo folder, run:
+2. Run the installer for your platform from the repo folder.
+
+### Windows PowerShell
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.107.ps1
 ```
 
+Writes to `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`, plus profile plugin folders when present.
+
+### macOS / Linux
+
+```bash
+chmod +x ./install-youtube-float-v3.107.sh
+./install-youtube-float-v3.107.sh
+```
+
+Writes to `~/.hermes/desktop-plugins`, `$HERMES_HOME/desktop-plugins` when set, macOS `~/Library/Application Support/hermes/desktop-plugins`, and profile plugin folders when present.
+
 3. Fully quit and reopen Hermes Desktop.
 4. Confirm the pane title shows **YouTube v3.107 ★**.
-
-The installer writes to both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`, plus profile plugin folders when present.
 
 ---
 
