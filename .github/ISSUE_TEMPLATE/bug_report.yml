@@ -10,8 +10,8 @@ body:
     id: version
     attributes:
       label: Plugin version
-      description: Example: v3.119. The pane title shows this as `YouTube vX.Y ★`.
-      placeholder: v3.119
+      description: Example: v3.120. The pane title shows this as `YouTube vX.Y ★`.
+      placeholder: v3.120
     validations:
       required: true
   - type: dropdown

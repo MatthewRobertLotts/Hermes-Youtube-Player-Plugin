@@ -26,6 +26,7 @@ const required = [
   'src/youtube-core.mjs',
   'tests/youtube-core.test.mjs',
   'scripts/build-release-zip.py',
+  'scripts/changelog-release-notes.py',
   'SECURITY.md',
   '.github/ISSUE_TEMPLATE/bug_report.yml',
   'TROUBLESHOOTING.md',

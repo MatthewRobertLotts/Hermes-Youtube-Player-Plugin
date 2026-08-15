@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.120
+- Add stdlib release-notes generator from the current changelog entry.
+- Add CI smoke check for generated GitHub release notes.
+- Document the release notes command in README and release checklist.
+
 ## v3.119
 - Restore historical changelog headings that were flattened by earlier release bumps.
 - Add release consistency checks for duplicate changelog versions.
