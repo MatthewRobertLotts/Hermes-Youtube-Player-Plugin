@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.104
+- Scrape rendered YouTube History links.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.103
 - Test History from Google My Activity.
 - Updates plugin source, installer, README, and version page.

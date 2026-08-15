@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.103-myactivity-history'
+const VERSION = 'v3.104-youtube-rendered-history'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -88,7 +88,7 @@ const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
 const ACCOUNT_FEEDS = {
   subscriptions: 'https://www.youtube.com/feed/subscriptions',
   watchlater: 'https://www.youtube.com/playlist?list=WL',
-  history: 'https://myactivity.google.com/product/youtube',
+  history: 'https://www.youtube.com/feed/history?app=desktop',
   yourplaylists: 'https://www.youtube.com/feed/you'
 }
 function cacheBust(url) { return url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now() }
@@ -204,17 +204,21 @@ const scrapeSearchScript = '(' + function () {
     for (const k in o) walk(o[k])
   }
   try { walk(window.ytInitialData) } catch (e) {}
-  // ponytail: Google My Activity is the account-history source; it exposes plain YouTube watch links.
+  // ponytail: YouTube history is channel/account-scoped; scrape rendered watch links from that page.
   try {
-    for (const a of Array.from(document.querySelectorAll('a[href*="youtube.com/watch"],a[href*="youtu.be/"]'))) {
+    const current = (location.href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || [])[1] || ''
+    for (const a of Array.from(document.querySelectorAll('a[href*="/watch"]'))) {
       const href = a.href || ''
-      const id = (href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || href.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || [])[1]
-      if (!id) continue
-      const box = a.closest('[role="listitem"], article, div') || a
-      let title = (a.textContent || box.textContent || '').replace(/\s+/g, ' ').trim()
+      const id = (href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || [])[1]
+      if (!id || id === current || href.indexOf('/shorts/') !== -1) continue
+      if (a.closest('#player,#movie_player,ytd-player,ytd-miniplayer,#masthead')) continue
+      const box = a.closest('ytd-video-renderer,ytd-rich-item-renderer,ytd-compact-video-renderer,ytd-grid-video-renderer,[role="listitem"]') || a
+      let title = (box.querySelector('#video-title,yt-formatted-string[aria-label],h3,a[title]')?.getAttribute('title') || box.querySelector('#video-title,yt-formatted-string[aria-label],h3,a[title]')?.textContent || a.getAttribute('title') || a.textContent || box.textContent || '').replace(/\s+/g, ' ').trim()
       title = title.replace(/^Watched\s+/i, '').replace(/\s+-\s+YouTube$/i, '').trim()
-      if (!title || title.length < 3) title = id
-      push(id, title, 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg', '', 'video', null)
+      if (!title || title.length < 3 || title.length > 180) title = id
+      const img = box.querySelector('img')?.src || 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg'
+      const dur = box.querySelector('.ytd-thumbnail-overlay-time-status-renderer,#text.ytd-thumbnail-overlay-time-status-renderer')?.textContent?.replace(/\s+/g, ' ').trim() || ''
+      push(id, title, img, dur, 'video', null)
     }
   } catch (e) {}
   return { items: out, renderers: keyCount, page: { title: document.title || '', url: location.href || '', hasData: !!window.ytInitialData, bodyLen: (document.body ? document.body.innerHTML.length : 0), ytLen: window.ytInitialData ? JSON.stringify(window.ytInitialData).length : 0 } }
@@ -1228,7 +1232,7 @@ function YouTubeDashboard() {
           if (clean.length) {
             const rowItems = key === 'playlists'
               ? clean.filter(i => /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) || /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.list || '') || i.type === 'playlist').map(i => ({ ...i, id: (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) ? i.id : (i.list || i.id)), type: 'playlist' }))
-              : (key === 'shorts' ? clean.filter(i => i.type === 'short').map(i => ({ ...i, type: 'short' })) : (key === 'history' ? clean.filter(i => i.type !== 'short') : clean))
+              : (key === 'shorts' ? clean.filter(i => i.type === 'short').map(i => ({ ...i, type: 'short' })) : (key === 'history' ? clean.filter(i => i.type === 'video') : clean))
             if (rowItems.length) {
               liveDashboardRows[key] = rowItems
               emitPlayerStatus()
@@ -1385,7 +1389,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.103 ★',
+        title: 'YouTube v3.104 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
