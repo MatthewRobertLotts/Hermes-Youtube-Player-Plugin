@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.125
+- Add offline YouTube structure fixtures and parser resilience tests for missing renderers, partial data, nested arrays, empty shelves, malformed metadata, and unknown renderer types.
+- Add per-dashboard-source state so shelf failures degrade independently without breaking playback or other shelves.
+- Expand diagnostics with adapter/strategy success and broad failure logging for YouTube extraction paths.
+
 ## v3.124
 - Upgrade update checks into a safety-first updater contract based on GitHub Releases stable artifacts.
 - Validate release origin, artifact name/type/size, plugin ID, downloaded version, and fallback behavior before any install path.

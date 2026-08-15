@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  adapterState,
   YOUTUBE_COMPAT,
   autoAdvanceQueueItem,
   compareVersions,
@@ -9,6 +10,7 @@ import {
   nextQueueItem,
   normaliseDashboardRow,
   normalisePrefs,
+  parseYouTubeItems,
   playlistIdFrom,
   previousQueueItem,
   startSecondsFrom,
@@ -18,11 +20,14 @@ import {
   validateDownloadedPlugin,
   validateRelease,
   videoIdFrom,
+  rendererCounts,
   watchUrl,
 } from '../src/youtube-core.mjs';
 
 const id = 'dQw4w9WgXcQ';
 const other = 'abcDEF12345';
+
+const fixtures = await import('./fixtures/youtube-structures.mjs');
 
 test('extracts video IDs from common YouTube URL shapes', () => {
   assert.equal(videoIdFrom(id), id);
@@ -128,4 +133,25 @@ test('validates safe updater contracts', () => {
   assert.equal(validateDownloadedPlugin({ manifest: { id: UPDATE_CONTRACT.pluginId, version: 'v3.124' }, pluginSource: "const VERSION = 'v3.124'\nexport default {}\n".repeat(80), expectedVersion: 'v3.124' }).ok, true);
   assert.equal(updaterPlan({ current: 'v3.123', release: release('v3.124'), hasWriteBridge: false }).action, 'fallback');
   assert.equal(updaterPlan({ current: 'v3.123', release: release('v3.124'), hasWriteBridge: true, writeOk: false }).reason, 'failed write');
+});
+
+
+test('parses resilient offline YouTube fixtures', () => {
+  const items = parseYouTubeItems(fixtures.mixedInitialData, { source: 'recommended' });
+  assert.deepEqual(items.map(i => [i.id, i.type]), [[fixtures.ids.video, 'video'], [fixtures.ids.short, 'short'], [fixtures.ids.playlist, 'playlist']]);
+  assert.deepEqual(parseYouTubeItems(fixtures.mixedInitialData, { source: 'playlists' }).map(i => i.id), [fixtures.ids.playlist]);
+  assert.deepEqual(parseYouTubeItems(fixtures.partialInitialData, { source: 'history' }).map(i => i.id), [fixtures.ids.other]);
+  assert.deepEqual(parseYouTubeItems(fixtures.emptyInitialData), []);
+  assert.deepEqual(parseYouTubeItems(fixtures.malformedMetadata), []);
+});
+
+test('classifies adapter states independently', () => {
+  assert.equal(adapterState({ loading: true }), 'loading');
+  assert.equal(adapterState({ signedIn: false }), 'signed-out');
+  assert.equal(adapterState({ network: true }), 'network-failure');
+  assert.equal(adapterState({ error: 'renderer changed' }), 'compatibility-failure');
+  assert.equal(adapterState({ unavailable: true }), 'unavailable');
+  assert.equal(adapterState({ items: [] }), 'empty');
+  assert.equal(adapterState({ items: [{ id: 'x' }] }), 'ready');
+  assert.equal(rendererCounts(fixtures.mixedInitialData).videoRenderer, 1);
 });

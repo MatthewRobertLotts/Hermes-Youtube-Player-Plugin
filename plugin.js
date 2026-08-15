@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.124'
+const VERSION = 'v3.125'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -23,6 +23,7 @@ const YT_VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/
 const YT_PLAYLIST_ID_RE = /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/
 const YT_WEBVIEW_PARTITION = 'persist:hermes-youtube-float-player'
 const YT_HISTORY_BROWSE_ID = 'FEhistory'
+const DASHBOARD_STATE_MESSAGES = { loading: 'Loading…', signedOut: 'Sign in to load this shelf', empty: 'No items yet', unavailable: 'Unavailable from YouTube right now', compatibility: 'YouTube changed this shelf — diagnostics can help', network: 'Network problem loading this shelf' }
 let pluginStorage = null
 let setPlayerPlacement = null
 let setPlayerOpen = null
@@ -36,6 +37,7 @@ let livePlayerState = null
 let liveAccountState = null
 let liveDashboardResults = []
 let liveDashboardRows = { history: [], playlists: [], shorts: [], subscriptions: [], videos: [], watchlater: [] }
+let liveDashboardStates = { history: 'loading', playlists: 'loading', recommended: 'loading', shorts: 'loading', subscriptions: 'signed-out', watchlater: 'signed-out' }
 let dashboardLoadFeed = null
 let dashboardPlayerCommand = null
 let dashboardPlayItem = null
@@ -1391,6 +1393,9 @@ function YouTubeDashboard() {
   useEffect(() => {
     // ponytail: History has one writer: the visible signed-in History pane. Avoid stale module rows from older tests.
     if (account.signedIn) liveDashboardRows.history = []
+    liveDashboardStates.subscriptions = account.signedIn ? 'loading' : 'signed-out'
+    liveDashboardStates.watchlater = account.signedIn ? 'loading' : 'signed-out'
+    liveDashboardStates.playlists = account.signedIn ? 'loading' : 'signed-out'
     if (dashboardBackgroundLoadStarted) return undefined
     dashboardBackgroundLoadStarted = true
     const jobs = [
@@ -1405,7 +1410,9 @@ function YouTubeDashboard() {
     jobs.forEach(([key, ref], jobIndex) => {
       const tick = attempt => window.setTimeout(async () => {
         if (cancelled || (liveDashboardRows[key] || []).length) return
+        liveDashboardStates[key] = 'loading'
         try {
+          diag('dashboard', 'extract start', { adapter: key, strategy: key === 'history' ? 'youtubei' : 'ytInitialData+dom' })
           const res = await ref.current?.executeJavaScript(key === 'history' ? historyApiScript : scrapeSearchScript, true)
           const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title)
           if (clean.length) {
@@ -1415,12 +1422,18 @@ function YouTubeDashboard() {
             if (rowItems.length) {
               if (key === 'history' && (liveDashboardRows.history || []).length) return
               liveDashboardRows[key] = key === 'history' ? rowItems.filter(v => v.id !== livePlayerState?.videoId) : rowItems
+              liveDashboardStates[key] = liveDashboardRows[key].length ? 'ready' : 'empty'
+              diag('dashboard', 'extract success', { adapter: key, strategy: key === 'history' ? 'youtubei' : 'ytInitialData+dom', count: liveDashboardRows[key].length })
               emitPlayerStatus()
               return
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          liveDashboardStates[key] = /fetch|network/i.test(e?.message || '') ? 'network' : 'compatibility'
+          diag('dashboard', 'extract failed', { adapter: key, strategy: key === 'history' ? 'youtubei' : 'ytInitialData+dom', reason: e?.message || 'unknown' })
+        }
         if (attempt < 10) tick(attempt + 1)
+        else { if (liveDashboardStates[key] === 'loading') liveDashboardStates[key] = 'empty'; emitPlayerStatus() }
       }, 1800 + jobIndex * 900 + attempt * 1200)
       tick(0)
     })
@@ -1433,6 +1446,8 @@ function YouTubeDashboard() {
   const localRecent = Array.isArray(history) ? history.slice(0, 18) : []
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
+  const rowState = key => liveDashboardStates[key] || 'loading'
+  const rowEmpty = (key, fallback) => rowState(key) === 'signed-out' ? DASHBOARD_STATE_MESSAGES.signedOut : (rowState(key) === 'compatibility' ? DASHBOARD_STATE_MESSAGES.compatibility : (rowState(key) === 'network' ? DASHBOARD_STATE_MESSAGES.network : (rowState(key) === 'unavailable' ? DASHBOARD_STATE_MESSAGES.unavailable : (rowState(key) === 'empty' ? DASHBOARD_STATE_MESSAGES.empty : fallback))))
   const homeItems = rows.recommended || []
   const rawHistory = (rows.history || []).length ? rows.history : (account.signedIn ? [] : localRecent)
   const recommended = homeItems.filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
@@ -1520,12 +1535,12 @@ function YouTubeDashboard() {
     ] }),
     // ponytail: dashboard shelves are one UI cluster; move/style/edit them together.
     jsxs('main', { className: 'min-h-0 overflow-y-auto pt-4', children: [
-      shelf('Recommended videos', recommended, 'Loading Home recommendations…'),
-      shelf('History', recent, 'Loading history…'),
-      shelf('Subscriptions', subscriptions, account.signedIn ? 'Loading subscriptions…' : 'Sign in to load subscriptions'),
-      shelf('Watch Later', watchlater, account.signedIn ? 'Loading Watch Later…' : 'Sign in to use Watch Later'),
-      shelf('Shorts', shorts, 'Loading Shorts…'),
-      shelf('Playlists', playlists, account.signedIn ? 'Loading playlists…' : 'Sign in to load playlists')
+      shelf('Recommended videos', recommended, rowEmpty('recommended', 'Loading Home recommendations…')),
+      shelf('History', recent, rowEmpty('history', 'Loading history…')),
+      shelf('Subscriptions', subscriptions, rowEmpty('subscriptions', account.signedIn ? 'Loading subscriptions…' : 'Sign in to load subscriptions')),
+      shelf('Watch Later', watchlater, rowEmpty('watchlater', account.signedIn ? 'Loading Watch Later…' : 'Sign in to use Watch Later')),
+      shelf('Shorts', shorts, rowEmpty('shorts', 'Loading Shorts…')),
+      shelf('Playlists', playlists, rowEmpty('playlists', account.signedIn ? 'Loading playlists…' : 'Sign in to load playlists'))
     ] })
   ] })
 }
@@ -1569,7 +1584,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.124 ★',
+        title: 'YouTube v3.125 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

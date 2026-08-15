@@ -82,3 +82,13 @@ test('plugin.js safe updater falls back without an explicit Hermes write bridge'
   assert.match(plugin, /manual install required/);
   assert.match(plugin, /current version untouched/);
 });
+
+
+test('plugin.js keeps dashboard compatibility resilience boundaries', () => {
+  assert.match(plugin, /liveDashboardStates/);
+  assert.match(plugin, /DASHBOARD_STATE_MESSAGES/);
+  assert.match(plugin, /extract start/);
+  assert.match(plugin, /extract success/);
+  assert.match(plugin, /extract failed/);
+  assert.match(plugin, /adapter: key/);
+});

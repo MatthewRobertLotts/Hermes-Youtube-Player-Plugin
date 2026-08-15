@@ -26,6 +26,7 @@ const required = [
   'src/youtube-core.mjs',
   'tests/youtube-core.test.mjs',
   'tests/plugin-runtime-parity.test.mjs',
+  'tests/fixtures/youtube-structures.mjs',
   'scripts/build-release-zip.py',
   'scripts/changelog-release-notes.py',
   'scripts/publish-release.py',

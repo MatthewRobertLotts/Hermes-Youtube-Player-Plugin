@@ -119,3 +119,16 @@ The plugin runs with Hermes renderer/plugin privileges and can register UI, rout
 ## Known coverage limits
 
 Automated tests cover deterministic helpers, release tooling, and runtime parity contracts. They do not launch Hermes Desktop, Electron webviews, or live YouTube pages.
+
+
+## YouTube compatibility hotspots
+
+Volatile YouTube dependencies are isolated to adapters:
+
+- `scrapeSearchScript`: `ytInitialData`, renderer names, fallback DOM anchors.
+- `historyApiScript`: `ytcfg`, Innertube `/youtubei/v1/browse`, `FEhistory`, fallback initial data traversal.
+- `stateScript`, `driveScript`, `readPlayerScript`, `readCaptionsScript`: undocumented player methods and `ytInitialPlayerResponse`.
+- `playlistFillScript`: playlist panel renderers and playlist lockups.
+- Dashboard background loading: each shelf runs independently and records its own state.
+
+Compatibility fixes should patch one adapter and add an offline fixture or parity test. A broken shelf must degrade to an empty/unavailable state and must not break playback or other shelves.

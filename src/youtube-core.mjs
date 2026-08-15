@@ -171,3 +171,101 @@ export function updaterPlan({ current, release, hasWriteBridge = false, writeOk 
   if (!writeOk) return { action: 'fallback', reason: 'failed write', validation };
   return { action: 'install', reason: 'validated', validation };
 }
+
+
+export const YOUTUBE_RENDERERS = Object.freeze({
+  historyBrowse: YOUTUBE_COMPAT.historyBrowseId,
+  playlist: ['playlistRenderer', 'compactPlaylistRenderer', 'gridPlaylistRenderer', 'radioRenderer', 'playlistPanelVideoRenderer'],
+  shorts: ['reelItemRenderer', 'shortsLockupViewModel'],
+  video: ['videoRenderer', 'playlistVideoRenderer', 'lockupViewModel'],
+});
+
+export function textOf(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value.simpleText || (Array.isArray(value.runs) ? value.runs.map(r => r.text || '').join('') : '');
+}
+
+export function walkYouTube(value, visit, limit = 2000) {
+  let seen = 0;
+  const walk = node => {
+    if (!node || seen >= limit) return;
+    seen += 1;
+    if (Array.isArray(node)) { for (const item of node) walk(item); return; }
+    if (typeof node !== 'object') return;
+    visit(node);
+    for (const key of Object.keys(node)) walk(node[key]);
+  };
+  walk(value);
+}
+
+export function rendererCounts(data) {
+  const counts = {};
+  walkYouTube(data, node => {
+    for (const key of Object.keys(node)) if (/Renderer|ViewModel$/.test(key) && node[key] && typeof node[key] === 'object') counts[key] = (counts[key] || 0) + 1;
+  });
+  return counts;
+}
+
+export function parseYouTubeItems(data, { source = 'search', currentVideoId = '' } = {}) {
+  const out = [];
+  const seen = new Set();
+  const push = item => {
+    const id = item?.id;
+    const title = String(item?.title || '').replace(/\s+/g, ' ').trim();
+    if (!id || !title || seen.has(id) || /now playing/i.test(title)) return;
+    seen.add(id);
+    out.push({ duration: item.duration || '', id, list: item.list || null, thumb: item.thumb || '', title, type: item.type || 'video' });
+  };
+  const firstThumb = obj => {
+    try { return JSON.stringify(obj || '').match(/"url":"(https:[^"]{10,})"/)?.[1] || ''; } catch { return ''; }
+  };
+  const playlistFromEndpoint = ep => {
+    try {
+      const raw = ep?.watchEndpoint?.playlistId || ep?.commandMetadata?.webCommandMetadata?.url || '';
+      if (PLAYLIST_ID_RE.test(raw)) return raw;
+      return String(raw).match(/[?&]list=([^&]+)/)?.[1] || '';
+    } catch { return ''; }
+  };
+  walkYouTube(data, node => {
+    const vr = node.videoRenderer;
+    if (vr?.videoId) {
+      const url = vr.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url || '';
+      if (source === 'history' && url.includes('/shorts/')) return;
+      push({ id: vr.videoId, title: textOf(vr.title), thumb: firstThumb(vr.thumbnail), duration: textOf(vr.lengthText), type: url.includes('/shorts/') ? 'short' : 'video', list: url.match(/list=([^&]+)/)?.[1] || null });
+    }
+    const pvr = node.playlistVideoRenderer;
+    if (pvr?.videoId) push({ id: pvr.videoId, title: textOf(pvr.title), thumb: firstThumb(pvr.thumbnail), duration: textOf(pvr.lengthText), type: 'video' });
+    const reel = node.reelItemRenderer;
+    if (reel?.videoId) push({ id: reel.videoId, title: textOf(reel.headline) || 'Short', type: 'short' });
+    const shorts = node.shortsLockupViewModel;
+    if (shorts?.videoId) push({ id: shorts.videoId, title: String(shorts.accessibilityText || 'Short').replace(/,?\s*\d[\d,.]*\s*(million|billion|k)?\s*views\s*[–-]\s*play\s*short$/i, ''), thumb: firstThumb(shorts.thumbnail), type: 'short' });
+    const lockup = node.lockupViewModel;
+    if (lockup?.contentId) {
+      let title = lockup.metadata?.lockupMetadataViewModel?.title?.content || '';
+      if (PLAYLIST_ID_RE.test(lockup.contentId)) push({ id: lockup.contentId, list: lockup.contentId, title, thumb: firstThumb(lockup.contentImage), type: 'playlist' });
+      else if (String(lockup.contentType || '').includes('SHORT')) push({ id: lockup.contentId, title, thumb: firstThumb(lockup.contentImage), type: 'short' });
+      else push({ id: lockup.contentId, title, thumb: firstThumb(lockup.contentImage), type: 'video' });
+    }
+    const pr = node.playlistRenderer;
+    if (pr?.playlistId) push({ id: pr.playlistId, list: pr.playlistId, title: textOf(pr.title) || 'Playlist', type: 'playlist' });
+    for (const key of ['compactPlaylistRenderer', 'gridPlaylistRenderer', 'radioRenderer']) {
+      const rr = node[key];
+      const list = rr && (rr.playlistId || playlistFromEndpoint(rr.navigationEndpoint));
+      if (list) push({ id: list, list, title: textOf(rr.title) || textOf(rr.shortBylineText) || 'Playlist', thumb: firstThumb(rr.thumbnail), type: 'playlist' });
+    }
+    const list = playlistFromEndpoint(node.navigationEndpoint);
+    if (list) push({ id: list, list, title: textOf(node.title) || node.metadata?.lockupMetadataViewModel?.title?.content || 'Playlist', thumb: firstThumb(node.thumbnail || node.contentImage), type: 'playlist' });
+  });
+  return normaliseDashboardRow(source === 'recommended' ? 'videos' : source, out, currentVideoId);
+}
+
+export function adapterState({ signedIn = true, items = [], loading = false, error = '', network = false, unavailable = false } = {}) {
+  if (loading) return 'loading';
+  if (!signedIn) return 'signed-out';
+  if (network) return 'network-failure';
+  if (error) return 'compatibility-failure';
+  if (unavailable) return 'unavailable';
+  if (!items.length) return 'empty';
+  return 'ready';
+}
