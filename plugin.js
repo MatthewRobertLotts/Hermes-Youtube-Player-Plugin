@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.96-right-stats-panel'
+const VERSION = 'v3.97-scrollable-description'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -424,7 +424,7 @@ const stateScript = '(' + function () {
     const pr = window.ytInitialPlayerResponse || {}
     const vd = pr.videoDetails || {}
     channel = vd.author || ''
-    description = (vd.shortDescription || '').replace(/\s+/g, ' ').trim()
+    description = (vd.shortDescription || '').trim()
     views = vd.viewCount || ''
   } catch (e) {}
   let playerState = null
@@ -1252,6 +1252,8 @@ function YouTubeDashboard() {
   const btn = 'rounded-full border bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
   const metric = (label, value) => jsxs('div', { className: 'rounded-xl bg-white/[0.055] px-3 py-2', children: [jsx('div', { className: 'text-lg font-semibold leading-none', children: value }), jsx('div', { className: 'mt-0.5 text-[10px] text-(--ui-text-tertiary)', children: label })] })
   const infoBox = (label, value) => jsxs('div', { className: 'min-w-0 rounded-xl bg-white/[0.055] px-3 py-2', style: { border: '1px solid ' + DASH_BORDER }, children: [jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: label }), jsx('div', { className: 'mt-1 truncate text-sm font-semibold', children: value })] })
+  const linkify = text => String(text || '').split(/(https?:\/\/[^\s]+)/g).filter(Boolean).map((part, i) => /^https?:\/\//.test(part) ? jsx('a', { className: 'text-(--ui-accent) underline underline-offset-2 hover:brightness-125', href: part, onClick: e => e.stopPropagation(), rel: 'noreferrer', target: '_blank', children: part }, i) : part)
+  const descriptionBlocks = String(nowDescription || '').split(/\n{2,}|\s*\/\/\s*/).map(x => x.trim()).filter(Boolean)
   const videoCard = item => jsxs('button', { className: 'w-40 shrink-0 text-left', onClick: () => playFromDashboard(item), title: item.title || item.id, type: 'button', children: [
     jsx('img', { alt: '', className: 'aspect-video w-40 rounded-lg bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
     jsx('div', { className: 'mt-1 line-clamp-2 text-xs font-medium leading-snug', children: item.title || item.id }),
@@ -1301,9 +1303,9 @@ function YouTubeDashboard() {
           infoBox('Views', nowViews),
           infoBox('List', current?.playlist ? 'Playlist' : 'Single')
         ] }),
-        jsxs('div', { className: 'min-h-0 rounded-xl bg-white/[0.045] px-3 py-2', style: { border: '1px solid ' + DASH_BORDER }, children: [
+        jsxs('div', { className: 'grid min-h-0 rounded-xl bg-white/[0.045] px-3 py-2', style: { gridTemplateRows: 'auto minmax(0, 1fr)', border: '1px solid ' + DASH_BORDER }, children: [
           jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: 'Description' }),
-          jsx('div', { className: 'mt-1 line-clamp-5 text-xs leading-snug text-(--ui-text-secondary)', children: nowDescription })
+          jsx('div', { className: 'mt-1 min-h-0 overflow-y-auto pr-2 text-xs leading-snug text-(--ui-text-secondary)', children: descriptionBlocks.map((block, i) => jsx('p', { className: 'mb-2 last:mb-0 whitespace-pre-wrap', children: linkify(block) }, i)) })
         ] }),
         jsxs('div', { className: 'grid grid-cols-4 gap-2', children: [
           metric('Recommended', recommended.length),
@@ -1364,7 +1366,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.96 ★',
+        title: 'YouTube v3.97 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

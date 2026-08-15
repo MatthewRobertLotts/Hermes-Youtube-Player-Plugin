@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.97
+- Scroll and format video descriptions.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.96
 - Add the dashboard stats panel.
 - Updates plugin source, installer, README, and version page.
