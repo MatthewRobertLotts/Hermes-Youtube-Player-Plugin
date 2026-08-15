@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.70
+- Stabilize dashboard account toggling.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.69
 - Test the bento dashboard layout.
 - Updates plugin source, installer, README, and version page.
