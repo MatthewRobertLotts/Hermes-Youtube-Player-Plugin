@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.128'
+const VERSION = 'v3.129'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -104,7 +104,7 @@ const fmt = seconds => {
 function Timeline({ current, duration, onSeek, videoId }) {
   return jsxs('div', { className: 'mb-1 flex min-w-0 flex-1 items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
     jsx('span', { className: 'shrink-0 tabular-nums', children: fmt(current) }),
-    jsx('input', { className: 'h-2 min-w-0 flex-1 accent-(--ui-accent)', disabled: !videoId, max: duration || 0, min: 0, onChange: e => onSeek(Number(e.currentTarget.value)), onPointerUp: e => e.currentTarget.blur(), type: 'range', value: Math.min(current, duration || current) }),
+    jsx('input', { 'aria-label': 'Seek position', className: 'hermes-yt-seek h-2 min-w-0 flex-1 accent-(--ui-accent)', disabled: !videoId, max: duration || 0, min: 0, onChange: e => onSeek(Number(e.currentTarget.value)), onPointerUp: e => e.currentTarget.blur(), type: 'range', value: Math.min(current, duration || current) }),
     jsx('span', { className: 'shrink-0 tabular-nums', children: fmt(duration) })
   ] })
 }
@@ -1308,8 +1308,8 @@ function YouTubeFloat({ pane = false } = {}) {
     if (setPlayerPlacement) setPlayerPlacement(v)
   }
   const pinButton = jsx('button', { 'aria-label': placement === 'docked' ? 'Unpin player' : 'Pin player', className: 'grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)', onClick: togglePlacement, title: placement === 'docked' ? 'Pinned: click to float' : 'Floating: click to dock', type: 'button', children: placement === 'docked' ? '📌' : '📍' })
-  return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
-    jsx('style', { children: '.hermes-yt-local-fullscreen{position:fixed!important;inset:0!important;z-index:2147483647!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;background:#000!important}' }),
+  return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', 'data-youtube-float': '1', ref: rootRef, tabIndex: 0, children: [
+    jsx('style', { children: '.hermes-yt-local-fullscreen{position:fixed!important;inset:0!important;z-index:2147483647!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;background:#000!important}[data-youtube-float] :focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}.hermes-yt-seek{min-width:0!important}[data-youtube-float] button:disabled{cursor:not-allowed}' }),
     jsx('div', {
       className: cn('relative shrink-0 bg-black', bigScreenActive && 'hermes-yt-local-fullscreen'),
       ref: fullscreenBoxRef,
@@ -1494,14 +1494,15 @@ function YouTubeDashboard() {
     jsx('h2', { className: 'mb-2 text-sm font-semibold', children: title }),
     jsx('div', { className: 'flex gap-3 overflow-x-auto scroll-smooth pb-2 pr-2', children: items.length ? items.map(mapper) : [emptyTile(empty)] })
   ] }, title)
-  return jsxs('div', { className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
+  return jsxs('div', { 'data-youtube-float': '1', className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
+    jsx('style', { children: '[data-youtube-float] :focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}@media (max-width:980px){.yt-dashboard-panels{grid-template-columns:1fr!important;grid-template-rows:260px minmax(0,1fr)!important;overflow-y:auto}.yt-dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}.yt-dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}' }),
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: homeRef, src: stableSource('https://www.youtube.com/') }),
     jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: YT_WEBVIEW_PARTITION, ref: historyFeedRef, src: stableSource(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: subsRef, src: stableSource(ACCOUNT_FEEDS.subscriptions) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: watchLaterRef, src: stableSource(ACCOUNT_FEEDS.watchlater) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: playlistsRef, src: stableSource(ACCOUNT_FEEDS.yourplaylists) }) : null,
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: shortsRef, src: stableSource(searchSrc('shorts', 'shorts')) }),
-    jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-2xl bg-white/[0.04] p-2', style: { gridTemplateColumns: '580px minmax(0, 1fr)', gap: 12 }, children: [
+    jsxs('div', { className: 'yt-dashboard-panels grid h-full min-h-0 overflow-hidden rounded-2xl bg-white/[0.04] p-2', style: { gridTemplateColumns: '580px minmax(0, 1fr)', gap: 12 }, children: [
       jsxs('div', { className: 'grid min-h-0', style: { gridTemplateRows: '290px 104px', gap: 8 }, children: [
         jsx('img', { alt: '', className: 'h-full min-h-0 w-full rounded-xl bg-black object-contain', style: { border: '1px solid ' + DASH_BORDER }, src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
         jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-xl bg-black/40 px-4 py-2', style: { gridTemplateRows: '20px 22px 32px', rowGap: 8, border: '1px solid ' + DASH_BORDER }, children: [
@@ -1526,7 +1527,7 @@ function YouTubeDashboard() {
           jsx('div', { className: 'mt-1 line-clamp-1 text-base font-semibold leading-snug', children: nowTitle }),
           jsx('div', { className: 'mt-1 truncate text-xs text-(--ui-text-tertiary)', children: current?.videoId ? (current.paused ? 'Paused' : 'Playing') : 'No active video yet' })
         ] }),
-        jsxs('div', { className: 'grid grid-cols-4 gap-2', children: [
+        jsxs('div', { className: 'grid grid-cols-4 gap-2 yt-dashboard-stats', children: [
           infoBox('Channel', nowChannel),
           infoBox('Duration', fmt(current?.duration || 0)),
           infoBox('Views', nowViews),
@@ -1536,7 +1537,7 @@ function YouTubeDashboard() {
           jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: 'Description' }),
           jsx('div', { className: 'mt-1 min-h-0 overflow-y-auto pr-2 text-xs leading-snug text-(--ui-text-secondary)', children: descriptionBlocks.map((block, i) => jsx('p', { className: 'mb-2 last:mb-0 whitespace-pre-wrap', children: linkify(block) }, i)) })
         ] }),
-        jsxs('div', { className: 'grid grid-cols-4 gap-2', children: [
+        jsxs('div', { className: 'grid grid-cols-4 gap-2 yt-dashboard-metrics', children: [
           metric('Recommended', recommended.length),
           metric('History', recent.length),
           metric('Playlists', playlists.length),
@@ -1595,7 +1596,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.128 ★',
+        title: 'YouTube v3.129 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

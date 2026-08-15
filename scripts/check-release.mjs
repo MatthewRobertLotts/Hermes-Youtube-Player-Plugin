@@ -36,6 +36,7 @@ const required = [
   'CONTRIBUTING.md',
   'ARCHITECTURE.md',
   'PERFORMANCE.md',
+  'docs/release-tests/v3.129-responsive-ux-accessibility.md',
 ];
 for (const file of required) if (!exists(file)) fail(`missing ${file}`);
 

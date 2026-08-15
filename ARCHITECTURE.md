@@ -135,8 +135,12 @@ Compatibility fixes should patch one adapter and add an offline fixture or parit
 
 ## Manual playback reliability testing
 
-Live Hermes/Electron/YouTube behavior is tracked in `docs/release-tests/v3.128-playback-reliability.md`. Keep CI deterministic; do not pretend live webview behavior is covered by unit tests.
+Live Hermes/Electron/YouTube behavior is tracked in `docs/release-tests/v3.129-playback-reliability.md`. Keep CI deterministic; do not pretend live webview behavior is covered by unit tests.
 
 ### Docked/Floating lifecycle
 
-See `docs/release-tests/v3.128-docked-floating-lifecycle.md`. In-UI placement swaps and close/reopen are the signature feature; keep them regression-checked manually in real Hermes.
+See `docs/release-tests/v3.129-docked-floating-lifecycle.md`. In-UI placement swaps and close/reopen are the signature feature; keep them regression-checked manually in real Hermes.
+
+### Responsive & accessibility
+
+Manual desktop-size/scaling/a11y checks live in `docs/release-tests/v3.129-responsive-ux-accessibility.md`. UI polish must not become a redesign.

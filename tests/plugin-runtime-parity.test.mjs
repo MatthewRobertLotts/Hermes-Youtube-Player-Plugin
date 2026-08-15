@@ -117,3 +117,15 @@ test('plugin.js lifecycle cleanup prevents duplicate players and handlers', () =
   assert.match(plugin, /liveQueueState/);
   assert.match(plugin, /queueResume/);
 });
+
+
+test('plugin.js ships responsive/a11y polish without redesign markers', () => {
+  assert.match(plugin, /data-youtube-float/);
+  assert.match(plugin, /focus-visible/);
+  assert.equal((plugin.match(/'aria-label': 'Seek position'/g) || []).length, 1);
+  assert.match(plugin, /yt-dashboard-panels/);
+  assert.match(plugin, /yt-dashboard-metrics/);
+  assert.match(plugin, /yt-dashboard-stats/);
+  // plugin must not steal keyboard from Hermes chat: only an Escape to exit fullscreen.
+  assert.match(plugin, /if \(e\.key === 'Escape'\) setLocalFullscreen\(false\)/);
+});
