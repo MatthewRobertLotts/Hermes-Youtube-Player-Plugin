@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.66-dashboard'
+const VERSION = 'v3.67-dashboard-plus'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -13,6 +13,7 @@ const SEARCH_FILTERS = [
   ['yourplaylists', 'Your Playlists']
 ]
 const HISTORY_KEY = 'hermes-yt-history'
+const SEARCH_HISTORY_KEY = 'hermes-yt-search-history'
 const PREF_KEY = 'hermes-yt-prefs'
 const HISTORY_MAX = 50
 const SWITCH_RESUME_MS = 120000
@@ -20,6 +21,7 @@ let pluginStorage = null
 let setPlayerPlacement = null
 let setPlayerOpen = null
 let closePlayerPane = null
+let openAccountPane = null
 let playerOpenState = true
 let playerPlacementState = 'docked'
 let livePlayerState = null
@@ -399,17 +401,20 @@ const stateScript = '(' + function () {
   let vid = ''
   try { vid = (p && typeof p.getVideoData === 'function' && p.getVideoData().video_id) || '' } catch (e) {}
   if (!vid) { const m = location.href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || location.pathname.match(/\/(?:shorts|embed)\/([a-zA-Z0-9_-]{11})/); vid = m ? m[1] : '' }
+  let title = ''
+  try { title = (p && typeof p.getVideoData === 'function' && p.getVideoData().title) || '' } catch (e) {}
+  if (!title) title = (document.querySelector('h1 yt-formatted-string, h1.title')?.textContent || document.title || '').replace(/ - YouTube$/, '').trim()
   let playerState = null
   try { if (p && typeof p.getPlayerState === 'function') playerState = p.getPlayerState() } catch (e) {}
   if (p && typeof p.getCurrentTime === 'function') {
     const current = p.getCurrentTime() || 0
     const duration = p.getDuration() || 0
     const paused = p.isPaused ? p.isPaused() : (v ? v.paused : true)
-    return { ok: true, current, duration, paused, ended, endedFlag: flag, videoId: vid, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
+    return { ok: true, current, duration, paused, ended, endedFlag: flag, videoId: vid, title, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
   }
   const current = (v && v.currentTime) || 0
   const duration = (v && v.duration) || 0
-  return { ok: true, current, duration, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
+  return { ok: true, current, duration, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid, title, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
 }.toString() + ')()'
 
 const playlistFillScript = '(' + function () {
@@ -479,6 +484,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const [loginPane, setLoginPane] = useState(false)
   const loginPaneRef = useRef(loginPane)
   loginPaneRef.current = loginPane
+  openAccountPane = () => { setPlayerOpen && setPlayerOpen(true); setLoginPane(true); setVolumeOpen(false) }
   const [historyPane, setHistoryPane] = useState(false)
   const [playlistsPane, setPlaylistsPane] = useState(false)
   const [signedIn, setSignedIn] = useState(accountPrefs.signedIn === true)
@@ -523,8 +529,21 @@ function YouTubeFloat({ pane = false } = {}) {
   const fullscreenMaskUntilRef = useRef(0)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
+  const [searchHistory, setSearchHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY)) || [] } catch (e) { return [] } })
   const historyRef = useRef(history)
   historyRef.current = history
+  const searchHistoryRef = useRef(searchHistory)
+  searchHistoryRef.current = searchHistory
+  const rememberSearch = q => {
+    const term = String(q || '').trim()
+    if (!term) return
+    const entry = { term, at: Date.now() }
+    const next = [entry, ...searchHistoryRef.current.filter(h => h.term !== term)].slice(0, 20)
+    searchHistoryRef.current = next
+    setSearchHistory(next)
+    try { localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next)) } catch (e) {}
+    try { pluginStorage?.set('searchHistory', next) } catch (e) {}
+  }
   const remember = (result, index) => {
     if (!result || !result.id) return
     if (result.type === 'playlist' && /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(result.id)) return
@@ -533,6 +552,7 @@ function YouTubeFloat({ pane = false } = {}) {
     historyRef.current = next
     setHistory(next)
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch (e) {}
+    try { pluginStorage?.set('history', next) } catch (e) {}
   }
   const showHistory = () => {
     // Signed in: open a REAL visible history pane in the player area (YouTube serves real data
@@ -621,7 +641,7 @@ function YouTubeFloat({ pane = false } = {}) {
   }, [pane, placement])
 
 
-  const capture = (vid, list) => {
+  const capture = (vid, list, meta = {}) => {
     setVideoId(vid)
     setPlaylist(list || null)
     setVolumeOpen(false)
@@ -630,7 +650,7 @@ function YouTubeFloat({ pane = false } = {}) {
     nativeRef.current = false
     setStreams([])
     setStatus('Loading…')
-    livePlayerState = { at: Date.now(), current: 0, paused: false, playlist: list || null, videoId: vid }
+    livePlayerState = { at: Date.now(), current: 0, paused: false, playlist: list || null, title: meta.title || '', thumb: meta.thumb || '', videoId: vid }
     driftGuardRef.current = Date.now() + 2000
     autostartRef.current = 0
   }
@@ -828,7 +848,7 @@ function YouTubeFloat({ pane = false } = {}) {
         if (!r || !r.ok) return
         if (!interacting) setProgress({ current: r.current, duration: r.duration, paused: r.paused, videoId: r.videoId })
         if (fullscreenBusy && Date.now() > fullscreenMaskUntilRef.current && (r.ready || r.paused)) setFullscreenBusy(false)
-        if (r.videoId || videoId) livePlayerState = { at: Date.now(), current: r.current || 0, paused: r.paused, playlist, videoId: r.videoId || videoId }
+        if (r.videoId || videoId) livePlayerState = { at: Date.now(), current: r.current || 0, paused: r.paused, playlist, title: r.title || livePlayerState?.title || '', thumb: livePlayerState?.thumb || '', videoId: r.videoId || videoId }
         const list = resultsRef.current
         const expected = list[indexRef.current]?.id
         // YouTube's own up-next can start a video we never asked for before our poll notices the
@@ -954,7 +974,8 @@ function YouTubeFloat({ pane = false } = {}) {
     // Account-bound modes (Subscriptions / Watch Later) need a signed-in session.
     if (ACCOUNT_FEEDS[filter] && !signedIn) { setStatus('Sign in first (Account button) to use ' + (SEARCH_FILTERS.find(f => f[0] === filter) || [])[1]); return }
     const exact = !ACCOUNT_FEEDS[filter] && next ? videoIdFrom(next) : null
-    if (exact) { setResults([]); capture(exact); return }
+    if (!ACCOUNT_FEEDS[filter]) rememberSearch(next)
+    if (exact) { setResults([]); capture(exact, null, { title: next }); return }
     setStatus(ACCOUNT_FEEDS[filter] ? 'Loading ' + ((SEARCH_FILTERS.find(f => f[0] === filter) || [])[1]) + '…' : 'Searching YouTube…')
     setResults([])
     setQueueMode('search')
@@ -970,7 +991,7 @@ function YouTubeFloat({ pane = false } = {}) {
     const item = result.type === 'playlist' && !entry
     if (entry) { setCurrentIndex(0); setResults([]) }
     else setCurrentIndex(index)
-    capture(result.id, entry ? (result.list || result.id) : (item ? playlistStateRef.current : result.list))
+    capture(result.id, entry ? (result.list || result.id) : (item ? playlistStateRef.current : result.list), result)
     // Armed AFTER capture() — capture disarms the window, so it only lives for the playlist
     // entry itself and any later navigation (item click, chain advance) cancels it.
     autostartRef.current = entry ? Date.now() + 8000 : 0
@@ -1114,57 +1135,78 @@ function YouTubeFloat({ pane = false } = {}) {
 
 function YouTubeDashboard() {
   const prefs = readPrefs()
-  const history = (() => { try { return pluginStorage ? pluginStorage.get('history', []) : (JSON.parse(localStorage.getItem(HISTORY_KEY)) || []) } catch (e) { return [] } })()
+  const readList = (key, storeKey) => {
+    try { const local = JSON.parse(localStorage.getItem(key)) || []; if (local.length) return local } catch (e) {}
+    try { return pluginStorage?.get(storeKey, []) || [] } catch (e) { return [] }
+  }
+  const history = readList(HISTORY_KEY, 'history')
+  const searches = readList(SEARCH_HISTORY_KEY, 'searchHistory')
   const account = liveAccountState || prefs.account || {}
+  const current = livePlayerState || null
   const [state, setState] = useState({ open: playerOpenState, placement: playerPlacementState })
   useEffect(() => { statusListeners.add(setState); setState({ open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
   const open = placement => { if (setPlayerPlacement) setPlayerPlacement(placement); else if (setPlayerOpen) setPlayerOpen(true) }
-  const card = 'rounded-xl border border-(--ui-border-muted) bg-(--ui-bg-elevated)/80 p-4 shadow-sm'
-  const button = 'rounded-lg border border-(--ui-border-muted) bg-(--ui-bg-editor) px-3 py-2 text-sm text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary)'
+  const manageAccount = () => { open('docked'); if (openAccountPane) window.setTimeout(openAccountPane, 50) }
+  const card = 'rounded-2xl border border-(--ui-border-muted) bg-(--ui-bg-elevated)/80 p-4 shadow-sm'
+  const button = 'rounded-lg border border-(--ui-border-muted) bg-(--ui-bg-editor) px-3 py-2 text-sm text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50'
   const recent = Array.isArray(history) ? history.slice(0, 8) : []
-  return jsxs('div', { className: 'h-full overflow-auto bg-(--ui-bg) p-6 text-(--ui-text-primary)', children: [
-    jsxs('div', { className: 'mx-auto flex max-w-5xl flex-col gap-5', children: [
+  const searchList = Array.isArray(searches) ? searches.slice(0, 10) : []
+  const count = type => recent.filter(x => x.type === type).length
+  const totalWatch = recent.reduce((n, x) => n + (Number(x.duration && String(x.duration).split(':').reduce((a, b) => a * 60 + Number(b || 0), 0)) || 0), 0)
+  const nowTitle = current?.title || recent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
+  return jsxs('div', { className: 'h-full overflow-auto bg-gradient-to-br from-black via-(--ui-bg) to-black p-6 text-(--ui-text-primary)', children: [
+    jsxs('div', { className: 'mx-auto flex max-w-6xl flex-col gap-5', children: [
       jsxs('div', { className: 'flex flex-wrap items-end justify-between gap-3', children: [
         jsxs('div', { children: [
           jsx('div', { className: 'text-xs font-medium uppercase tracking-[0.2em] text-(--ui-accent)', children: 'Hermes YouTube' }),
           jsx('h1', { className: 'mt-1 text-3xl font-semibold tracking-tight', children: 'YouTube Dashboard' }),
-          jsx('p', { className: 'mt-2 max-w-2xl text-sm text-(--ui-text-secondary)', children: 'Native controls for the locked YouTube player. Open the player, switch placement, and see recent videos.' })
+          jsx('p', { className: 'mt-2 max-w-2xl text-sm text-(--ui-text-secondary)', children: 'Native dashboard for the locked YouTube player: placement, account, current video, searches, history, and quick stats.' })
         ] }),
         jsx('span', { className: cn('rounded-full px-3 py-1 text-xs font-medium', state.open ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'), children: state.open ? 'Open · ' + (state.placement === 'floating' ? 'Floating' : 'Docked') : 'Closed' })
       ] }),
-      jsxs('div', { className: 'grid gap-4 md:grid-cols-3', children: [
-        jsxs('section', { className: card, children: [
-          jsx('h2', { className: 'text-sm font-semibold', children: 'Player' }),
-          jsx('p', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: state.open ? 'Player pane is active.' : 'Player pane is closed.' }),
-          jsxs('div', { className: 'mt-4 flex flex-wrap gap-2', children: [
-            jsx('button', { className: button, onClick: () => open('docked'), type: 'button', children: 'Open docked' }),
-            jsx('button', { className: button, onClick: () => open('floating'), type: 'button', children: 'Open floating' }),
-            jsx('button', { className: button, onClick: () => setPlayerOpen && setPlayerOpen(false), type: 'button', children: 'Close' })
+      jsxs('div', { className: 'grid gap-4 xl:grid-cols-[1.4fr_0.9fr_0.9fr]', children: [
+        jsxs('section', { className: cn(card, 'overflow-hidden'), children: [
+          jsx('h2', { className: 'text-sm font-semibold', children: 'Now playing' }),
+          jsxs('div', { className: 'mt-4 flex gap-4', children: [
+            jsx('img', { alt: '', className: 'aspect-video w-44 rounded-xl bg-black object-cover', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
+            jsxs('div', { className: 'min-w-0 flex-1', children: [
+              jsx('div', { className: 'truncate text-lg font-semibold', children: nowTitle }),
+              jsx('div', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: current?.videoId ? fmt(current.current || 0) + (current.paused ? ' · paused' : ' · playing') : 'No active video yet' }),
+              jsxs('div', { className: 'mt-4 flex flex-wrap gap-2', children: [
+                jsx('button', { className: button, onClick: () => open('docked'), type: 'button', children: 'Docked' }),
+                jsx('button', { className: button, onClick: () => open('floating'), type: 'button', children: 'Floating' }),
+                jsx('button', { className: button, onClick: () => setPlayerOpen && setPlayerOpen(false), type: 'button', children: 'Close' })
+              ] })
+            ] })
           ] })
         ] }),
         jsxs('section', { className: card, children: [
           jsx('h2', { className: 'text-sm font-semibold', children: 'Account' }),
-          jsx('p', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: account.signedIn ? ('Signed in' + (account.name ? ' as ' + account.name : '')) : 'Not signed in yet.' }),
-          jsx('button', { className: cn(button, 'mt-4'), onClick: () => open('docked'), type: 'button', children: account.signedIn ? 'Manage in player' : 'Open player to sign in' })
+          jsx('p', { className: 'mt-2 text-sm text-(--ui-text-secondary)', children: account.signedIn ? ('Signed in' + (account.name ? ' as ' + account.name : '')) : 'Not signed in yet.' }),
+          jsx('button', { className: cn(button, 'mt-4'), onClick: manageAccount, type: 'button', children: account.signedIn ? 'Manage account' : 'Sign in' })
         ] }),
         jsxs('section', { className: card, children: [
-          jsx('h2', { className: 'text-sm font-semibold', children: 'Now playing' }),
-          jsx('p', { className: 'mt-1 truncate text-xs text-(--ui-text-tertiary)', children: livePlayerState?.videoId ? ('Video ' + livePlayerState.videoId + ' · ' + fmt(livePlayerState.current || 0)) : 'Nothing captured yet.' }),
-          jsx('button', { className: cn(button, 'mt-4'), disabled: !livePlayerState?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show player' })
+          jsx('h2', { className: 'text-sm font-semibold', children: 'Quick stats' }),
+          jsxs('div', { className: 'mt-4 grid grid-cols-3 gap-2 text-center', children: [
+            jsxs('div', { className: 'rounded-xl bg-(--ui-bg-editor) p-3', children: [jsx('div', { className: 'text-xl font-semibold', children: recent.length }), jsx('div', { className: 'text-[10px] text-(--ui-text-tertiary)', children: 'recent' })] }),
+            jsxs('div', { className: 'rounded-xl bg-(--ui-bg-editor) p-3', children: [jsx('div', { className: 'text-xl font-semibold', children: searchList.length }), jsx('div', { className: 'text-[10px] text-(--ui-text-tertiary)', children: 'searches' })] }),
+            jsxs('div', { className: 'rounded-xl bg-(--ui-bg-editor) p-3', children: [jsx('div', { className: 'text-xl font-semibold', children: count('short') }), jsx('div', { className: 'text-[10px] text-(--ui-text-tertiary)', children: 'shorts' })] })
+          ] }),
+          jsx('div', { className: 'mt-3 text-xs text-(--ui-text-tertiary)', children: totalWatch ? 'Recent saved duration: ' + fmt(totalWatch) : 'Play videos to build dashboard data.' })
         ] })
       ] }),
-      jsxs('section', { className: card, children: [
-        jsxs('div', { className: 'flex items-center justify-between gap-3', children: [
-          jsx('h2', { className: 'text-sm font-semibold', children: 'Recent' }),
-          jsx('span', { className: 'text-xs text-(--ui-text-tertiary)', children: recent.length ? recent.length + ' saved' : 'Empty' })
+      jsxs('div', { className: 'grid gap-4 lg:grid-cols-2', children: [
+        jsxs('section', { className: card, children: [
+          jsxs('div', { className: 'flex items-center justify-between gap-3', children: [jsx('h2', { className: 'text-sm font-semibold', children: 'Search history' }), jsx('span', { className: 'text-xs text-(--ui-text-tertiary)', children: searchList.length ? searchList.length + ' terms' : 'Empty' })] }),
+          searchList.length ? jsx('div', { className: 'mt-4 flex flex-wrap gap-2', children: searchList.map(item => jsx('button', { className: 'rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-3 py-1.5 text-xs text-(--ui-text-secondary)', onClick: () => open('docked'), title: 'Open player and search: ' + item.term, type: 'button', children: item.term }, item.term)) }) : jsx('p', { className: 'mt-4 text-sm text-(--ui-text-tertiary)', children: 'Search from the player and terms will appear here.' })
         ] }),
-        recent.length ? jsx('div', { className: 'mt-4 grid gap-2 sm:grid-cols-2', children: recent.map(item => jsxs('button', { className: 'flex min-w-0 items-center gap-3 rounded-lg border border-(--ui-border-muted) bg-(--ui-bg-editor)/70 p-2 text-left hover:border-(--ui-accent)', onClick: () => open(state.placement || 'docked'), title: item.title || item.id, type: 'button', children: [
-          jsx('img', { alt: '', className: 'h-12 w-20 rounded bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
-          jsxs('span', { className: 'min-w-0', children: [
-            jsx('span', { className: 'block truncate text-sm', children: item.title || item.id }),
-            jsx('span', { className: 'block text-xs text-(--ui-text-tertiary)', children: item.duration || 'YouTube video' })
-          ] })
-        ] }, item.id || item.title)) }) : jsx('p', { className: 'mt-4 text-sm text-(--ui-text-tertiary)', children: 'Search or play something in the player and it will appear here.' })
+        jsxs('section', { className: card, children: [
+          jsxs('div', { className: 'flex items-center justify-between gap-3', children: [jsx('h2', { className: 'text-sm font-semibold', children: 'Recent videos' }), jsx('span', { className: 'text-xs text-(--ui-text-tertiary)', children: recent.length ? recent.length + ' saved' : 'Empty' })] }),
+          recent.length ? jsx('div', { className: 'mt-4 grid gap-2', children: recent.map(item => jsxs('button', { className: 'flex min-w-0 items-center gap-3 rounded-lg border border-(--ui-border-muted) bg-(--ui-bg-editor)/70 p-2 text-left hover:border-(--ui-accent)', onClick: () => open(state.placement || 'docked'), title: item.title || item.id, type: 'button', children: [
+            jsx('img', { alt: '', className: 'h-12 w-20 rounded bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
+            jsxs('span', { className: 'min-w-0', children: [jsx('span', { className: 'block truncate text-sm', children: item.title || item.id }), jsx('span', { className: 'block text-xs text-(--ui-text-tertiary)', children: item.duration || 'YouTube video' })] })
+          ] }, item.id || item.title)) }) : jsx('p', { className: 'mt-4 text-sm text-(--ui-text-tertiary)', children: 'Play something in the player and it will appear here.' })
+        ] })
       ] })
     ] })
   ] })
@@ -1209,7 +1251,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.66 ★',
+        title: 'YouTube v3.67 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

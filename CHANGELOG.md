@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.67
+- Fix dashboard account opening and live title state.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.66
 - Add the native YouTube dashboard route.
 - Updates plugin source, installer, README, and version page.
