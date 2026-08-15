@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.110.1'
+const VERSION = 'v3.111'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -37,6 +37,26 @@ let pendingDashboardPlayItem = null
 let dashboardBackgroundLoadStarted = false
 const statusListeners = new Set()
 const emitPlayerStatus = () => statusListeners.forEach(fn => { try { fn({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }) } catch (e) {} })
+const DIAG_MAX = 120
+let diagnosticsEnabled = false
+let diagnosticLog = []
+const scrubDiag = value => {
+  if (value == null) return value
+  if (typeof value === 'string') return value.replace(/(cookie|token|auth|key|session|password|credential)[^\s,;)]*/gi, '$1=[redacted]').slice(0, 240)
+  if (typeof value === 'number' || typeof value === 'boolean') return value
+  if (Array.isArray(value)) return value.slice(0, 8).map(scrubDiag)
+  if (typeof value === 'object') {
+    const out = {}
+    Object.entries(value).slice(0, 12).forEach(([k, v]) => { out[k] = /cookie|token|auth|key|session|password|credential/i.test(k) ? '[redacted]' : scrubDiag(v) })
+    return out
+  }
+  return String(value).slice(0, 120)
+}
+const diag = (system, event, data) => {
+  if (!diagnosticsEnabled) return
+  diagnosticLog = [{ at: new Date().toISOString(), version: VERSION, system, event, data: scrubDiag(data) }, ...diagnosticLog].slice(0, DIAG_MAX)
+}
+const diagnosticPayload = () => JSON.stringify({ version: VERSION, platform: typeof navigator !== 'undefined' ? navigator.platform : 'unknown', userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown', entries: diagnosticLog }, null, 2)
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
 const savePrefs = prefs => { try { pluginStorage ? pluginStorage.set('prefs', prefs) : localStorage.setItem(PREF_KEY, JSON.stringify(prefs)) } catch (e) {} }
 const PLAYER_SIZES = {
@@ -567,6 +587,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const resumeStart = resumeStartRef.current
   const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
   const [volumeOpen, setVolumeOpen] = useState(false)
+  const [debugMode, setDebugMode] = useState(prefs.debug === true)
   const [localFullscreen, setLocalFullscreen] = useState(false)
   const [fullscreenBusy, setFullscreenBusy] = useState(false)
   const [loginPane, setLoginPane] = useState(false)
@@ -594,7 +615,7 @@ function YouTubeFloat({ pane = false } = {}) {
           setAccountName(account.name)
           return
         }
-      } catch (e) {}
+      } catch (e) { diag('account', 'probe failed', { message: e?.message }) }
     }
   }
   useEffect(() => {
@@ -606,6 +627,7 @@ function YouTubeFloat({ pane = false } = {}) {
     return undefined
   }, [loginPane, videoId])
   useEffect(() => { accountPaneOpenState = loginPane; emitPlayerStatus() }, [loginPane])
+  useEffect(() => { diagnosticsEnabled = debugMode; diag('diagnostics', debugMode ? 'enabled' : 'disabled', { entries: diagnosticLog.length }) }, [debugMode])
   useEffect(() => { if (accountPaneRequested && openAccountPane) openAccountPane() }, [])
   const [streams, setStreams] = useState([])
   const [native, setNative] = useState(false)
@@ -692,8 +714,8 @@ function YouTubeFloat({ pane = false } = {}) {
 
   useEffect(() => {
     const currentPrefs = readPrefs()
-    savePrefs({ account: currentPrefs.account, playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption })
-  }, [playerSize, placement, volume, loopMode, quality, caption])
+    savePrefs({ account: currentPrefs.account, debug: debugMode, playerOpen: currentPrefs.playerOpen !== false, playerSize, placement, volume, loopMode, quality, caption })
+  }, [playerSize, placement, volume, loopMode, quality, caption, debugMode])
 
   useEffect(() => {
     if (!pane || placement !== 'floating') return undefined
@@ -775,7 +797,7 @@ function YouTubeFloat({ pane = false } = {}) {
     const fillPlaylist = async () => {
       if (queueModeRef.current !== 'playlist' || resultsRef.current.length) return true
       let items = []
-      try { items = await webview.executeJavaScript(playlistFillScript, true) } catch (e) { }
+      try { items = await webview.executeJavaScript(playlistFillScript, true) } catch (e) { diag('playlist', 'fill script failed', { message: e?.message }) }
       if (queueModeRef.current !== 'playlist' || resultsRef.current.length) return true
       const clean = Array.isArray(items) ? items.filter(i => i.id && i.title) : []
       if (clean.length) {
@@ -808,7 +830,7 @@ function YouTubeFloat({ pane = false } = {}) {
         try {
           const c = await webview.executeJavaScript(readCaptionsScript, true)
           if (c && c.ok && Array.isArray(c.tracks) && c.tracks.length) setCaptions(c.tracks)
-        } catch {}
+        } catch (e) { diag('captions', 'read tracks failed', { message: e?.message }) }
         if (!(await fillPlaylist())) {
           retryTimer = window.setInterval(() => { void fillPlaylist().then(done => { if (done && retryTimer) { window.clearInterval(retryTimer); retryTimer = null } }) }, 1200)
           failTimer = window.setTimeout(() => {
@@ -820,7 +842,7 @@ function YouTubeFloat({ pane = false } = {}) {
             }
           }, 6000)
         }
-      } catch {}
+      } catch (e) { diag('player', 'dom-ready setup failed', { message: e?.message }) }
     }
     webview.addEventListener('dom-ready', ready)
     // Captions state settles after the player initializes; enforce the chosen state late so the
@@ -855,7 +877,7 @@ function YouTubeFloat({ pane = false } = {}) {
         if (attempts < 15) { window.setTimeout(tick, 1000); return }
         setStatus('History empty — no items appeared' + (res && res.page ? ' (page: ' + (res.page.title || '?') + ')' : ''))
         setHistoryPane(false)
-      } catch (e) { if (!cancelled) window.setTimeout(tick, 1000) }
+      } catch (e) { diag('history', 'load failed', { message: e?.message, attempt: attempts }); if (!cancelled) window.setTimeout(tick, 1000) }
     }
     const t = window.setTimeout(tick, 1200)
     return () => { cancelled = true; window.clearTimeout(t) }
@@ -887,7 +909,7 @@ function YouTubeFloat({ pane = false } = {}) {
         const pg = res && res.page ? ' | page: ' + (res.page.title || '?').slice(0, 40) + ' url=' + (res.page.url || '?').slice(0, 70) + ' hasData=' + res.page.hasData + ' body=' + res.page.bodyLen : ''
         setStatus('Your playlists empty (renderers: ' + rk + pg + ')')
         setPlaylistsPane(false)
-      } catch (e) { if (!cancelled) window.setTimeout(tick, 1000) }
+      } catch (e) { diag('playlists', 'load failed', { message: e?.message, attempt: attempts }); if (!cancelled) window.setTimeout(tick, 1000) }
     }
     const t = window.setTimeout(tick, 1600)
     return () => { cancelled = true; window.clearTimeout(t) }
@@ -1014,10 +1036,10 @@ function YouTubeFloat({ pane = false } = {}) {
         try {
           const r = await playerRef.current?.executeJavaScript(driveScript(action, value), true)
           if (r && r.ok) { setProgress({ current: r.current, duration: r.duration, paused: r.paused, videoId: r.videoId }); return }
-        } catch {}
+        } catch (e) { diag('player', 'command attempt failed', { action, attempt, message: e?.message }) }
         await new Promise(res => window.setTimeout(res, 250))
       }
-    } catch {}
+    } catch (e) { diag('player', 'command failed', { action, message: e?.message }) }
   }
   dashboardPlayerCommand = runCommand
 
@@ -1111,14 +1133,16 @@ function YouTubeFloat({ pane = false } = {}) {
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   useEffect(() => {
     if (!('mediaSession' in navigator)) return undefined
-    navigator.mediaSession.playbackState = progress.paused ? 'paused' : 'playing'
-    navigator.mediaSession.setActionHandler('play', () => void runCommand('play'))
-    navigator.mediaSession.setActionHandler('pause', () => void runCommand('pause'))
-    navigator.mediaSession.setActionHandler('previoustrack', () => playOffset(-1))
-    navigator.mediaSession.setActionHandler('nexttrack', () => playOffset(1))
-    navigator.mediaSession.setActionHandler('seekbackward', () => void runCommand('rewind'))
-    navigator.mediaSession.setActionHandler('seekforward', () => void runCommand('forward'))
-    return () => ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach(a => navigator.mediaSession.setActionHandler(a, null))
+    try {
+      navigator.mediaSession.playbackState = progress.paused ? 'paused' : 'playing'
+      navigator.mediaSession.setActionHandler('play', () => void runCommand('play'))
+      navigator.mediaSession.setActionHandler('pause', () => void runCommand('pause'))
+      navigator.mediaSession.setActionHandler('previoustrack', () => playOffset(-1))
+      navigator.mediaSession.setActionHandler('nexttrack', () => playOffset(1))
+      navigator.mediaSession.setActionHandler('seekbackward', () => void runCommand('rewind'))
+      navigator.mediaSession.setActionHandler('seekforward', () => void runCommand('forward'))
+    } catch (e) { diag('media-session', 'registration failed', { message: e?.message }) }
+    return () => ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, null) } catch (e) { diag('media-session', 'cleanup failed', { action: a, message: e?.message }) } })
   }, [progress.paused, results, currentIndex])
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   const toggleFullscreen = () => {
@@ -1144,6 +1168,10 @@ function YouTubeFloat({ pane = false } = {}) {
   // Static-title select: value pinned to a disabled-capable placeholder option carrying the label,
   // so the button always shows e.g. "Subs". On focus we sync the DOM value to the real selection so
   // the native popup ticks the active option; on blur we restore the label. Inline width = fixed.
+  const copyDiagnostics = async () => {
+    const text = diagnosticPayload()
+    try { await navigator.clipboard?.writeText(text); setStatus('Diagnostics copied — no cookies/tokens included') } catch (e) { diag('diagnostics', 'copy failed', { message: e?.message }); setStatus('Diagnostics ready: copy failed, browser denied clipboard') }
+  }
   const StaticSelect = ({ children, current, disabled, label, onChange, title, width = 68 }) => jsx('select', {
     className: 'h-6 min-w-0 cursor-pointer rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs text-(--ui-text-secondary) disabled:opacity-50',
     style: { width, maxWidth: width },
@@ -1235,6 +1263,8 @@ function YouTubeFloat({ pane = false } = {}) {
       jsx('select', { className: 'rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 text-xs', onChange: e => { const v = e.currentTarget.value; setFilter(v); if (ACCOUNT_FEEDS[v] || v === 'history') loadFeed(v) }, value: filter, children: SEARCH_FILTERS.map(([v, label]) => jsx('option', { value: v, children: label }, v)) }),
       jsx('input', { 'aria-label': 'Search YouTube or paste a video URL', className: cn('min-w-0 flex-1 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none', 'placeholder:text-(--ui-text-quaternary) focus:border-(--ui-accent)'), onChange: e => setDraft(e.currentTarget.value), placeholder: 'Search YouTube or paste URL…', value: draft }),
       jsx('button', { className: 'rounded-md bg-(--ui-accent) px-2.5 py-1.5 text-xs font-medium text-(--ui-accent-contrast) hover:brightness-110', type: 'submit', children: status === 'Searching YouTube…' ? 'Searching…' : 'Search' }),
+      jsx('button', { className: cn('shrink-0 rounded-md border px-2.5 py-1.5 text-xs', debugMode ? 'border-(--ui-accent) bg-(--ui-accent)/15 text-(--ui-accent)' : 'border-(--ui-border-muted) bg-(--ui-bg-editor) text-(--ui-text-secondary)'), onClick: () => setDebugMode(v => !v), title: 'Toggle diagnostic logging', type: 'button', children: debugMode ? 'Debug on' : 'Debug' }),
+      debugMode ? jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: copyDiagnostics, title: 'Copy diagnostics without cookies or tokens', type: 'button', children: 'Copy diagnostics' }) : null,
       jsx('button', { className: 'shrink-0 rounded-md border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 py-1.5 text-xs text-(--ui-text-secondary) hover:text-(--ui-text-primary)', onClick: () => { setLoginPane(p => !p); setVolumeOpen(false) }, title: loginPane ? 'Done — back to the locked player' : signedIn ? ('Signed in' + (accountName ? ' as ' + accountName : '')) : 'Sign in to your YouTube account', type: 'button', children: loginPane ? '✓ Done' : (signedIn ? (accountName ? '👤 ' + accountName.slice(0, 12) : '👤 Signed in') : 'Account') })
     ] }),
     !mini && results.length ? jsx('div', { className: 'max-h-[30vh] min-h-0 shrink-0 overflow-auto border-t border-white/10 bg-(--ui-bg-elevated)/95 p-1', children: results.map((result, index) => jsxs('button', { className: cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] hover:bg-(--chrome-action-hover)', (progress.videoId && result.id === progress.videoId) ? 'text-(--ui-accent)' : 'text-(--ui-text-secondary)'), onClick: () => play(result, index), title: result.title, type: 'button', children: [jsx('img', { alt: '', className: 'h-11 w-20 shrink-0 rounded object-cover bg-black', src: result.thumb || 'https://i.ytimg.com/vi/' + result.id + '/mqdefault.jpg' }), result.type === 'playlist' ? jsx('span', { className: 'shrink-0 rounded bg-(--ui-accent)/20 px-1 py-0.5 text-[9px] font-medium text-(--ui-accent)', children: '▶ Playlist' }) : null, jsx('span', { className: 'min-w-0 flex-1 truncate', children: result.title }), result.duration ? jsx('span', { className: 'shrink-0 text-[10px] text-(--ui-text-tertiary)', children: result.duration }) : null, (progress.videoId && result.id === progress.videoId) ? jsx('span', { className: 'shrink-0 text-[10px]', children: 'Playing' }) : null] }, result.id)) }) : (mini ? null : jsx('div', { className: 'min-h-0 flex-1 border-t border-white/10 px-2 py-2 text-[11px] text-(--ui-text-quaternary)', children: status === 'Searching YouTube…' ? 'Searching… results will appear here.' : status }))
@@ -1441,7 +1471,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.110.1 ★',
+        title: 'YouTube v3.111 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
