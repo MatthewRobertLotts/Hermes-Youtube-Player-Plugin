@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.65
+- Test the soft fullscreen veil.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.64
 - Keep the plugin-only Big Screen fallback.
 - Updates plugin source, installer, README, and version page.
