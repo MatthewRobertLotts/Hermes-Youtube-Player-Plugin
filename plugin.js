@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.57-real-fullscreen-fit'
+const VERSION = 'v3.58-clean-fullscreen-fit'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -468,6 +468,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
   const [volumeOpen, setVolumeOpen] = useState(false)
   const [localFullscreen, setLocalFullscreen] = useState(false)
+  const [fullscreenBusy, setFullscreenBusy] = useState(false)
   const [loginPane, setLoginPane] = useState(false)
   const loginPaneRef = useRef(loginPane)
   loginPaneRef.current = loginPane
@@ -630,20 +631,26 @@ function YouTubeFloat({ pane = false } = {}) {
   // "Up next" playlist panel carries the full list — so no separate hidden webview is needed.
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') setLocalFullscreen(false) }
-    const onFs = () => { if (!document.fullscreenElement) setLocalFullscreen(false) }
     window.addEventListener('keydown', onKey)
-    document.addEventListener('fullscreenchange', onFs)
-    return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('fullscreenchange', onFs) }
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   useEffect(() => {
     const webview = playerRef.current
     if (!webview || !videoId || loginPaneRef.current) return undefined
-    const apply = () => { try { void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true) } catch (e) {} }
+    const restore = progress.paused ? 'pause' : 'play'
+    const apply = () => {
+      try {
+        void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true)
+        void webview.executeJavaScript(driveScript(restore), true)
+      } catch (e) {}
+    }
     apply()
-    const timer = window.setTimeout(apply, 500)
-    return () => window.clearTimeout(timer)
-  }, [localFullscreen, videoId])
+    const a = window.setTimeout(apply, 160)
+    const b = window.setTimeout(apply, 520)
+    const c = window.setTimeout(() => setFullscreenBusy(false), 750)
+    return () => { window.clearTimeout(a); window.clearTimeout(b); window.clearTimeout(c) }
+  }, [localFullscreen, videoId, progress.paused])
 
   useEffect(() => {
     const webview = playerRef.current
@@ -984,14 +991,8 @@ function YouTubeFloat({ pane = false } = {}) {
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   const toggleFullscreen = () => {
     resumeStartRef.current = progress.current || 0
-    setLocalFullscreen(v => {
-      const next = !v
-      try {
-        if (next && !document.fullscreenElement) void document.documentElement.requestFullscreen?.()
-        if (!next && document.fullscreenElement) void document.exitFullscreen?.()
-      } catch (e) {}
-      return next
-    })
+    setFullscreenBusy(true)
+    setLocalFullscreen(v => !v)
   }
   const clickPlayerOverlay = () => {
     if (!videoId) return
@@ -1054,7 +1055,8 @@ function YouTubeFloat({ pane = false } = {}) {
         : (videoId
           ? jsxs('div', { className: 'absolute inset-0', children: [
               jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
-              jsx('button', { 'aria-label': 'Player click zone: click to play or pause, double-click for fullscreen', className: 'absolute inset-0 z-10 cursor-pointer bg-transparent', onClick: clickPlayerOverlay, onDoubleClick: doubleClickPlayerOverlay, title: 'Click: play/pause. Double-click: fullscreen. Esc exits fullscreen.', type: 'button' })
+              jsx('button', { 'aria-label': 'Player click zone: click to play or pause, double-click for fullscreen', className: 'absolute inset-0 z-10 cursor-pointer bg-transparent', onClick: clickPlayerOverlay, onDoubleClick: doubleClickPlayerOverlay, title: 'Click: play/pause. Double-click: fullscreen. Esc exits fullscreen.', type: 'button' }),
+              fullscreenBusy ? jsx('div', { className: 'pointer-events-none absolute inset-0 z-20 grid place-items-center bg-black text-xs text-white/60', children: localFullscreen ? 'Fullscreen…' : 'Returning…' }) : null
             ] })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
     }),
@@ -1140,7 +1142,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.57 ★',
+        title: 'YouTube v3.58 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

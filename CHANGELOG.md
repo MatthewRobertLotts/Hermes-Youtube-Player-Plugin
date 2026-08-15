@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.58
+- Tune fullscreen transition timing.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.57
 - Add fullscreen transition masking.
 - Updates plugin source, installer, README, and version page.
