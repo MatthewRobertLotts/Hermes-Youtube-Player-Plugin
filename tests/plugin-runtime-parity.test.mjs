@@ -92,3 +92,11 @@ test('plugin.js keeps dashboard compatibility resilience boundaries', () => {
   assert.match(plugin, /extract failed/);
   assert.match(plugin, /adapter: key/);
 });
+
+
+test('plugin.js playback reliability clamps seek and Shorts advance', () => {
+  assert.match(plugin, /p\.seekTo\(Math\.max\(0, Math\.min\(p\.getDuration\(\)/);
+  assert.match(plugin, /p\.seekTo\(Math\.max\(0, p\.getCurrentTime\(\) - 10\)/);
+  assert.match(plugin, /p\.seekTo\(Math\.min\(p\.getDuration\(\)/);
+  assert.match(plugin, /list\.slice\(indexRef\.current \+ 1\)\.find\(i => i\?\.type === 'short'\)/);
+});

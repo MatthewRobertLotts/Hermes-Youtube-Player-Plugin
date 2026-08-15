@@ -101,13 +101,51 @@ export function autoAdvanceQueueItem({ list, index, queueMode, playlistId }) {
   const cur = items[index];
   let next = null;
   if (cur?.type === 'short') {
-    next = items[index + 1]?.type === 'short' ? items[index + 1] : items.find(i => i.type === 'short') || null;
+    next = items.slice(index + 1).find(i => i?.type === 'short') || items.find((i, iIndex) => i?.type === 'short' && iIndex !== index) || null;
   } else if (queueMode === 'playlist' && items[index + 1]) {
     next = items[index + 1];
   }
   if (!next) return { next: null, playlist: null, index: -1 };
   const nextIndex = items.indexOf(next);
   return { next, playlist: queueMode === 'playlist' ? playlistId : next.list, index: nextIndex };
+}
+
+export function clampTime(value, duration = 0) {
+  const n = Math.max(0, Math.floor(Number(value) || 0));
+  const d = Math.max(0, Math.floor(Number(duration) || 0));
+  return d ? Math.min(n, d) : n;
+}
+
+export function seekBy(current, delta, duration = 0) {
+  return clampTime((Number(current) || 0) + (Number(delta) || 0), duration);
+}
+
+export function qualityChoice(requested, available = []) {
+  if (requested === 'auto') return 'auto';
+  return Array.isArray(available) && available.includes(requested) ? requested : 'auto';
+}
+
+export function captionChoice(requested, tracks = []) {
+  if (!requested || requested === 'off') return 'off';
+  return (Array.isArray(tracks) ? tracks : []).some(t => t?.lang === requested || t?.label === requested) ? requested : 'off';
+}
+
+export function dedupeQueue(items = []) {
+  const seen = new Set();
+  return (Array.isArray(items) ? items : []).filter(item => {
+    const key = item?.id ? `${item.type || 'video'}:${item.id}:${item.list || ''}` : '';
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function queueState(items = [], index = -1) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return 'empty';
+  if (index <= 0) return 'first';
+  if (index >= list.length - 1) return 'last';
+  return 'middle';
 }
 
 export function loopAction(mode) {

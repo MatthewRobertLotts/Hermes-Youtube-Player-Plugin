@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.126
+- Clamp seek, rewind, and forward commands so player API calls cannot seek before zero or past known duration.
+- Fix Shorts auto-advance so a Shorts queue moves to another Short instead of repeating the same item when another Short exists.
+- Add deterministic playback/queue tests plus a live manual playback reliability checklist for webview-only behavior.
+
 ## v3.125
 - Add offline YouTube structure fixtures and parser resilience tests for missing renderers, partial data, nested arrays, empty shelves, malformed metadata, and unknown renderer types.
 - Add per-dashboard-source state so shelf failures degrade independently without breaking playback or other shelves.

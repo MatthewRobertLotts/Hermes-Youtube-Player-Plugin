@@ -132,3 +132,7 @@ Volatile YouTube dependencies are isolated to adapters:
 - Dashboard background loading: each shelf runs independently and records its own state.
 
 Compatibility fixes should patch one adapter and add an offline fixture or parity test. A broken shelf must degrade to an empty/unavailable state and must not break playback or other shelves.
+
+## Manual playback reliability testing
+
+Live Hermes/Electron/YouTube behavior is tracked in `docs/release-tests/v3.126-playback-reliability.md`. Keep CI deterministic; do not pretend live webview behavior is covered by unit tests.

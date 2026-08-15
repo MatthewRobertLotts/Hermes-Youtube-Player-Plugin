@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.125'
+const VERSION = 'v3.126'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -411,9 +411,9 @@ function driveScript(action, value) {
       if (payload.action === 'playPause') { pausedOf() ? p.playVideo() : p.pauseVideo() }
       else if (payload.action === 'play') p.playVideo()
       else if (payload.action === 'pause') p.pauseVideo()
-      else if (payload.action === 'seek') p.seekTo(Number(payload.value), true)
-      else if (payload.action === 'rewind') p.seekTo(p.getCurrentTime() - 10, true)
-      else if (payload.action === 'forward') p.seekTo(p.getCurrentTime() + 10, true)
+      else if (payload.action === 'seek') p.seekTo(Math.max(0, Math.min(p.getDuration() || Number(payload.value) || 0, Number(payload.value) || 0)), true)
+      else if (payload.action === 'rewind') p.seekTo(Math.max(0, p.getCurrentTime() - 10), true)
+      else if (payload.action === 'forward') p.seekTo(Math.min(p.getDuration() || p.getCurrentTime() + 10, p.getCurrentTime() + 10), true)
       else if (payload.action === 'quality' && payload.value !== 'auto') {
         try { p.setPlaybackQualityRange(payload.value, payload.value); p.setPlaybackQuality(payload.value) } catch (e) { try { p.setPlaybackQuality(payload.value) } catch (e2) {} }
       }
@@ -1025,12 +1025,7 @@ function YouTubeFloat({ pane = false } = {}) {
         let next = null
         // 1) Shorts chain: only ever hand over to another short, wrapping around the shorts in the list.
         if (cur && cur.type === 'short') {
-          const nxt = list[indexRef.current + 1]
-          if (nxt && nxt.type === 'short') next = nxt
-          else {
-            const first = list.findIndex(i => i.type === 'short')
-            if (first !== -1) next = list[first]
-          }
+          next = list.slice(indexRef.current + 1).find(i => i?.type === 'short') || list.find((i, iIndex) => i?.type === 'short' && iIndex !== indexRef.current) || null
         }
         // 2) Playlist mode: advance through the loaded playlist videos to the end of the list.
         else if (qm === 'playlist' && list[indexRef.current + 1]) {
@@ -1584,7 +1579,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.125 ★',
+        title: 'YouTube v3.126 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

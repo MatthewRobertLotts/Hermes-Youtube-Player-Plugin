@@ -4,15 +4,21 @@ import {
   adapterState,
   YOUTUBE_COMPAT,
   autoAdvanceQueueItem,
+  captionChoice,
+  clampTime,
   compareVersions,
   isShortUrl,
   loopAction,
   nextQueueItem,
+  dedupeQueue,
   normaliseDashboardRow,
   normalisePrefs,
   parseYouTubeItems,
   playlistIdFrom,
+  qualityChoice,
+  queueState,
   previousQueueItem,
+  seekBy,
   startSecondsFrom,
   UPDATE_CONTRACT,
   updateState,
@@ -81,7 +87,7 @@ test('normalises dashboard shelves by source', () => {
 
 test('advances queues like the plugin runtime', () => {
   const shorts = [{ id: 'a', type: 'short' }, { id: 'b', type: 'video' }, { id: 'c', type: 'short', list: 'shorts' }];
-  assert.deepEqual(autoAdvanceQueueItem({ list: shorts, index: 0, queueMode: 'search', playlistId: null }), { next: shorts[0], playlist: undefined, index: 0 });
+  assert.deepEqual(autoAdvanceQueueItem({ list: shorts, index: 0, queueMode: 'search', playlistId: null }), { next: shorts[2], playlist: 'shorts', index: 2 });
   assert.deepEqual(nextQueueItem({ list: shorts, index: 2, queueMode: 'search', playlistId: null }), { next: shorts[0], playlist: undefined, index: 0 });
   const playlist = [{ id: 'a', type: 'video' }, { id: 'b', type: 'video' }];
   assert.deepEqual(autoAdvanceQueueItem({ list: playlist, index: 0, queueMode: 'playlist', playlistId: 'PLx' }), { next: playlist[1], playlist: 'PLx', index: 1 });
@@ -154,4 +160,29 @@ test('classifies adapter states independently', () => {
   assert.equal(adapterState({ items: [] }), 'empty');
   assert.equal(adapterState({ items: [{ id: 'x' }] }), 'ready');
   assert.equal(rendererCounts(fixtures.mixedInitialData).videoRenderer, 1);
+});
+
+
+test('hardens deterministic playback controls', () => {
+  assert.equal(clampTime(-5, 100), 0);
+  assert.equal(clampTime(500, 120), 120);
+  assert.equal(clampTime(30, 0), 30);
+  assert.equal(seekBy(3, -10, 100), 0);
+  assert.equal(seekBy(118, 10, 120), 120);
+  assert.equal(seekBy(3600, 10, 7200), 3610);
+  assert.equal(qualityChoice('hd720', ['auto', 'hd720']), 'hd720');
+  assert.equal(qualityChoice('hd2160', ['auto', 'hd720']), 'auto');
+  assert.equal(captionChoice('en', [{ lang: 'en', label: 'English' }]), 'en');
+  assert.equal(captionChoice('fr', [{ lang: 'en', label: 'English' }]), 'off');
+});
+
+test('hardens queue boundaries and duplicate/unavailable rows', () => {
+  const list = [{ id: 'a', type: 'video' }, { id: 'a', type: 'video' }, { id: 'b', type: 'video' }, { id: '', type: 'video' }];
+  assert.deepEqual(dedupeQueue(list).map(i => i.id), ['a', 'b']);
+  assert.equal(queueState([], -1), 'empty');
+  assert.equal(queueState([{ id: 'a' }], 0), 'first');
+  assert.equal(queueState([{ id: 'a' }, { id: 'b' }], 1), 'last');
+  assert.equal(queueState([{ id: 'a' }, { id: 'b' }, { id: 'c' }], 1), 'middle');
+  assert.deepEqual(previousQueueItem({ list: [{ id: 'a' }], index: 0 }), { previous: null, index: -1 });
+  assert.deepEqual(autoAdvanceQueueItem({ list: [{ id: 's', type: 'short' }], index: 0, queueMode: 'search' }), { next: null, playlist: null, index: -1 });
 });
