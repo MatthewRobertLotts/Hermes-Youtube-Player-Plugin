@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.57
+- Add fullscreen transition masking.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.56
 - Fit the watch page for Big Screen mode.
 - Updates plugin source, installer, README, and version page.

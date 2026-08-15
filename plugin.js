@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.56-watch-fullscreen-fit'
+const VERSION = 'v3.57-real-fullscreen-fit'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -629,11 +629,12 @@ function YouTubeFloat({ pane = false } = {}) {
   // list. In playlist mode the playlist's video list is scraped from this SAME page — its
   // "Up next" playlist panel carries the full list — so no separate hidden webview is needed.
   useEffect(() => {
-    if (!localFullscreen) return undefined
     const onKey = e => { if (e.key === 'Escape') setLocalFullscreen(false) }
+    const onFs = () => { if (!document.fullscreenElement) setLocalFullscreen(false) }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [localFullscreen])
+    document.addEventListener('fullscreenchange', onFs)
+    return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('fullscreenchange', onFs) }
+  }, [])
 
   useEffect(() => {
     const webview = playerRef.current
@@ -983,7 +984,14 @@ function YouTubeFloat({ pane = false } = {}) {
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   const toggleFullscreen = () => {
     resumeStartRef.current = progress.current || 0
-    setLocalFullscreen(v => !v)
+    setLocalFullscreen(v => {
+      const next = !v
+      try {
+        if (next && !document.fullscreenElement) void document.documentElement.requestFullscreen?.()
+        if (!next && document.fullscreenElement) void document.exitFullscreen?.()
+      } catch (e) {}
+      return next
+    })
   }
   const clickPlayerOverlay = () => {
     if (!videoId) return
@@ -1132,7 +1140,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.56 ★',
+        title: 'YouTube v3.57 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
