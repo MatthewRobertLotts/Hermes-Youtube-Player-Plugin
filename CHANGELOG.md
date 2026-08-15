@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.76
+- Load recommendations from YouTube Home.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.75
 - Add live dashboard controls and row stats.
 - Updates plugin source, installer, README, and version page.

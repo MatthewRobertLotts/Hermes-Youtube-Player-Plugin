@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.75-live-shelves'
+const VERSION = 'v3.76-home-recommendations'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -582,6 +582,7 @@ function YouTubeFloat({ pane = false } = {}) {
   // Load an account feed (Subscriptions / Watch Later / History) without needing a search term.
   // Auto-probes login so the mode resolves correctly as soon as it's picked.
   const loadFeed = filter => {
+    if (filter === 'recommended') { setQueueMode('search'); setResults([]); setStatus('Loading recommended videos…'); setSearchUrl(cacheBust('https://www.youtube.com/')); return }
     if (filter === 'history') { showHistory(); return }
     if (filter === 'yourplaylists') {
       if (!signedInRef.current) { setResults([]); setStatus('Sign in first (Account button) to use Your Playlists'); return }
@@ -962,7 +963,8 @@ function YouTubeFloat({ pane = false } = {}) {
         const found = res && Array.isArray(res.items) ? res.items : (Array.isArray(res) ? res : [])
         const clean = found.filter(v => v?.id && v?.title)
         liveDashboardResults = clean
-        liveDashboardRows[filter === 'watchlater' ? 'watchlater' : (filter || 'videos')] = clean
+        const dashKey = searchUrl && /^https:\/\/www\.youtube\.com\/?[?&]/.test(searchUrl) ? 'recommended' : (filter === 'watchlater' ? 'watchlater' : (filter || 'videos'))
+        liveDashboardRows[dashKey] = clean
         setResults(clean)
         setCurrentIndex(-1)
         if (clean[0]) setStatus('History — pick a result')
@@ -1167,7 +1169,7 @@ function YouTubeDashboard() {
   const recent = Array.isArray(history) ? history.slice(0, 18) : []
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
-  const videos = (rows.videos || []).filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
+  const recommended = (rows.recommended || []).filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
   const subscriptions = (rows.subscriptions || []).slice(0, 18)
   const watchlater = (rows.watchlater || []).slice(0, 18)
   const shorts = (rows.shorts || []).concat(recent.filter(x => x.type === 'short')).slice(0, 18)
@@ -1204,14 +1206,14 @@ function YouTubeDashboard() {
         ] })
       ] }),
       jsxs('div', { className: 'grid grid-cols-4 gap-2 self-center', children: [
-        metric('Videos', videos.length),
+        metric('Recommended', recommended.length),
         metric('History', recent.length),
         metric('Searches', searchList.length),
         metric('Shorts', shorts.length)
       ] })
     ] }),
     jsxs('main', { className: 'min-h-0 overflow-y-auto pt-4', children: [
-      shelf('Recommended videos', videos, 'Run a video search to fill recommended videos'),
+      shelf('Recommended videos', recommended, account.signedIn ? 'Load Home recommendations' : 'Load YouTube Home recommendations', videoCard, () => loadRow('recommended')),
       shelf('History', recent, 'Your played videos appear here', videoCard, () => loadRow('history')),
       shelf('Subscriptions', subscriptions, account.signedIn ? 'Load subscriptions' : 'Sign in to load subscriptions', videoCard, () => loadRow('subscriptions')),
       shelf('Watch Later', watchlater, account.signedIn ? 'Load Watch Later' : 'Sign in to use Watch Later', videoCard, () => loadRow('watchlater')),
@@ -1261,7 +1263,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.75 ★',
+        title: 'YouTube v3.76 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
