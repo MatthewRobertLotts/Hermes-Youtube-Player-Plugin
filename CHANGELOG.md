@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.69
+- Test the bento dashboard layout.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.68
 - Compact the dashboard layout.
 - Updates plugin source, installer, README, and version page.
