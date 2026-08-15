@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.68
+- Compact the dashboard layout.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.67
 - Fix dashboard account opening and live title state.
 - Updates plugin source, installer, README, and version page.
