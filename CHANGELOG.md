@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.56
+- Fit the watch page for Big Screen mode.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.55
 - Test the embed fullscreen path.
 - Updates plugin source, installer, README, and version page.

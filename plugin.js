@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.55-embed-fullscreen'
+const VERSION = 'v3.56-watch-fullscreen-fit'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -72,14 +72,6 @@ function watchUrl(videoId, playlistId, startAt = 0) {
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
 
-function embedUrl(videoId, playlistId, startAt = 0) {
-  if (!videoId) return 'about:blank'
-  const start = Math.max(0, Math.floor(Number(startAt) || 0))
-  let url = 'https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&enablejsapi=1'
-  if (start > 1) url += '&start=' + start
-  if (playlistId) url += '&list=' + encodeURIComponent(playlistId)
-  return url
-}
 const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
 // Signed-in feeds (only meaningful when the player partition is logged in).
 const ACCOUNT_FEEDS = {
@@ -232,6 +224,31 @@ const stripScript = '(' + function () {
   }
   return { ok: true }
 }.toString() + ')()'
+
+function fullscreenFitScript(active) {
+  return '(' + function (payload) {
+    const id = 'hermes-yt-fullscreen-fit'
+    let st = document.getElementById(id)
+    if (!payload.active) {
+      if (st) st.remove()
+      try { window.dispatchEvent(new Event('resize')) } catch (e) {}
+      return { ok: true, active: false }
+    }
+    const css = `
+      html,body,#player,#player-container-outer,#player-container-inner,#movie_player,.html5-video-player,.html5-video-container{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;left:0!important;top:0!important;right:auto!important;bottom:auto!important;transform:none!important;overflow:hidden!important;background:#000!important}
+      video,.html5-main-video{position:absolute!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;transform:none!important;object-fit:contain!important;background:#000!important}
+    `
+    if (!st) { st = document.createElement('style'); st.id = id; document.documentElement.appendChild(st) }
+    st.textContent = css
+    const resize = () => {
+      try { window.dispatchEvent(new Event('resize')) } catch (e) {}
+      try { document.dispatchEvent(new Event('resize')) } catch (e) {}
+      try { const p = document.getElementById('movie_player'); if (p && typeof p.setSize === 'function') p.setSize(window.innerWidth, window.innerHeight) } catch (e) {}
+    }
+    resize(); setTimeout(resize, 120); setTimeout(resize, 450); setTimeout(resize, 900)
+    return { ok: true, active: true, w: window.innerWidth, h: window.innerHeight }
+  }.toString() + ')(' + JSON.stringify({ active: !!active }) + ')'
+}
 
 function driveScript(action, value) {
   return '(' + function (payload) {
@@ -617,6 +634,15 @@ function YouTubeFloat({ pane = false } = {}) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [localFullscreen])
+
+  useEffect(() => {
+    const webview = playerRef.current
+    if (!webview || !videoId || loginPaneRef.current) return undefined
+    const apply = () => { try { void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true) } catch (e) {} }
+    apply()
+    const timer = window.setTimeout(apply, 500)
+    return () => window.clearTimeout(timer)
+  }, [localFullscreen, videoId])
 
   useEffect(() => {
     const webview = playerRef.current
@@ -1019,7 +1045,7 @@ function YouTubeFloat({ pane = false } = {}) {
         ? jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com', style: playerWebviewStyle })
         : (videoId
           ? jsxs('div', { className: 'absolute inset-0', children: [
-              jsx('webview', { key: videoId + (loginPane ? 'L' : '') + (localFullscreen ? 'F' : 'W'), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: localFullscreen ? embedUrl(videoId, playlist, resumeStart) : watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
+              jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
               jsx('button', { 'aria-label': 'Player click zone: click to play or pause, double-click for fullscreen', className: 'absolute inset-0 z-10 cursor-pointer bg-transparent', onClick: clickPlayerOverlay, onDoubleClick: doubleClickPlayerOverlay, title: 'Click: play/pause. Double-click: fullscreen. Esc exits fullscreen.', type: 'button' })
             ] })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
@@ -1106,7 +1132,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.55 ★',
+        title: 'YouTube v3.56 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
