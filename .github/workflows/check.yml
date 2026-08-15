@@ -30,6 +30,8 @@ jobs:
           shellcheck install-youtube-float.sh "install-youtube-float-${version}.sh"
       - name: Release notes smoke
         run: python3 scripts/changelog-release-notes.py > /tmp/youtube-float-release-notes.md
+      - name: Publish release dry-run
+        run: python3 scripts/publish-release.py --dry-run
       - name: Release zip package
         run: python3 scripts/build-release-zip.py --output /tmp/youtube-float-release.zip --check
       - name: PowerShell installer syntax

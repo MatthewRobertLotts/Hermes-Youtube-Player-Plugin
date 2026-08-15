@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.121
+- Add one-command GitHub Release publisher using the existing zip and release-note builders.
+- Add dry-run mode so CI can verify the publisher without creating releases.
+- Document the publish command in README and release checklist.
+
 ## v3.120
 - Add stdlib release-notes generator from the current changelog entry.
 - Add CI smoke check for generated GitHub release notes.

@@ -4,7 +4,7 @@ Use this before tagging a stable release.
 
 ## Version
 
-- [ ] Pick one canonical version, e.g. `v3.120`.
+- [ ] Pick one canonical version, e.g. `v3.121`.
 - [ ] `manifest.json` version matches.
 - [ ] `plugin.js` `VERSION` matches and has no suffix.
 - [ ] README badge/install commands match.
@@ -41,6 +41,7 @@ Use this before tagging a stable release.
 
 ## Publish
 
-- [ ] Create GitHub Release from the tag.
+- [ ] `python3 scripts/publish-release.py --dry-run`
+- [ ] `python3 scripts/publish-release.py`
 - [ ] Attach `youtube-float-desktop-plugin-<version>.zip`.
 - [ ] Include concise release notes and changelog link.
