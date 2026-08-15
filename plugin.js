@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.106-history-single-writer'
+const VERSION = 'v3.107-youtubei-history'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -223,6 +223,54 @@ const scrapeSearchScript = '(' + function () {
   } catch (e) {}
   return { items: out, renderers: keyCount, page: { title: document.title || '', url: location.href || '', hasData: !!window.ytInitialData, bodyLen: (document.body ? document.body.innerHTML.length : 0), ytLen: window.ytInitialData ? JSON.stringify(window.ytInitialData).length : 0 } }
 }.toString() + ')()'
+
+const historyApiScript = '(' + (async function () {
+  const out = []
+  const seen = new Set()
+  const txt = x => (x && (x.simpleText || ((x.runs || [{ text: '' }]).map(r => r.text).join('')))) || ''
+  const firstThumb = obj => { if (!obj) return ''; try { const m = JSON.stringify(obj).match(/"url":"(https:[^"]{10,})"/); return m ? m[1] : '' } catch (e) { return '' } }
+  const push = (id, title, thumb, duration) => {
+    if (!id || seen.has(id) || !title) return
+    seen.add(id)
+    out.push({ duration: duration || '', id, list: null, title: String(title).replace(/^Watched\s+/i, '').replace(/\s+/g, ' ').trim(), thumb: thumb || ('https://i.ytimg.com/vi/' + id + '/mqdefault.jpg'), type: 'video' })
+  }
+  const walk = o => {
+    if (out.length >= 48 || !o) return
+    if (Array.isArray(o)) { for (const x of o) walk(x); return }
+    if (typeof o !== 'object') return
+    const vr = o.videoRenderer
+    if (vr && vr.videoId) push(vr.videoId, txt(vr.title), firstThumb(vr.thumbnail), txt(vr.lengthText))
+    const lv = o.lockupViewModel
+    if (lv && lv.contentId && !/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(lv.contentId) && String(lv.contentType || '').indexOf('SHORT') === -1) {
+      let title = ''
+      try { title = lv.metadata.lockupMetadataViewModel.title.content || '' } catch (e) {}
+      let dur = ''
+      try { const ov = lv.contentImage.thumbnailViewModel.overlays; dur = (ov || []).map(x => x.thumbnailBottomOverlayViewModel && x.thumbnailBottomOverlayViewModel.badges && x.thumbnailBottomOverlayViewModel.badges[0] && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel && x.thumbnailBottomOverlayViewModel.badges[0].thumbnailBadgeViewModel.text || '').find(Boolean) || '' } catch (e) {}
+      push(lv.contentId, title, firstThumb(lv.contentImage), dur)
+    }
+    for (const k in o) walk(o[k])
+  }
+  try {
+    const cfg = window.ytcfg && window.ytcfg.data_ ? window.ytcfg.data_ : {}
+    const key = cfg.INNERTUBE_API_KEY
+    const context = cfg.INNERTUBE_CONTEXT || { client: { clientName: 'WEB', clientVersion: cfg.INNERTUBE_CLIENT_VERSION || '2.20260801.00.00' } }
+    if (key) {
+      const r = await fetch('/youtubei/v1/browse?key=' + encodeURIComponent(key), {
+        credentials: 'include',
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ context, browseId: 'FEhistory' })
+      })
+      const data = await r.json()
+      walk(data)
+    }
+  } catch (e) {}
+  if (!out.length) {
+    try { walk(window.ytInitialData) } catch (e) {}
+  }
+  return { items: out, page: { title: document.title || '', url: location.href || '', api: true, bodyLen: (document.body ? document.body.innerHTML.length : 0) } }
+}).toString() + ')()'
+
 
 const stripScript = '(' + function () {
   const css = `
@@ -792,7 +840,7 @@ function YouTubeFloat({ pane = false } = {}) {
     const tick = async () => {
       if (cancelled) return
       try {
-        const res = await historyPaneRef.current?.executeJavaScript(scrapeSearchScript, true)
+        const res = await historyPaneRef.current?.executeJavaScript(historyApiScript, true)
         if (cancelled) return
         const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title && v.type !== 'short' && v.id !== livePlayerState?.videoId)
         if (clean.length) {
@@ -1219,6 +1267,7 @@ function YouTubeDashboard() {
     dashboardBackgroundLoadStarted = true
     const jobs = [
       ['recommended', homeRef],
+      ['history', historyFeedRef],
       account.signedIn ? ['subscriptions', subsRef] : null,
       account.signedIn ? ['watchlater', watchLaterRef] : null,
       account.signedIn ? ['playlists', playlistsRef] : null,
@@ -1229,7 +1278,7 @@ function YouTubeDashboard() {
       const tick = attempt => window.setTimeout(async () => {
         if (cancelled || (liveDashboardRows[key] || []).length) return
         try {
-          const res = await ref.current?.executeJavaScript(scrapeSearchScript, true)
+          const res = await ref.current?.executeJavaScript(key === 'history' ? historyApiScript : scrapeSearchScript, true)
           const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title)
           if (clean.length) {
             const rowItems = key === 'playlists'
@@ -1293,6 +1342,7 @@ function YouTubeDashboard() {
   ] }, title)
   return jsxs('div', { className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
+    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
@@ -1391,7 +1441,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.106 ★',
+        title: 'YouTube v3.107 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
