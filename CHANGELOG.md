@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.53
+- Add fullscreen restore handling.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.52
 - Refine fullscreen behavior.
 - Updates plugin source, installer, README, and version page.
