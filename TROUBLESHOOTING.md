@@ -4,7 +4,7 @@
 
 1. Install the latest release zip from GitHub Releases.
 2. Fully quit and reopen Hermes Desktop.
-3. Confirm the pane title shows `YouTube v3.121 ★`.
+3. Confirm the pane title shows `YouTube v3.122 ★`.
 4. If reporting a bug, turn on **Debug**, reproduce it, then click **Copy diagnostics**.
 
 Do not paste cookies, passwords, tokens, or private account data.

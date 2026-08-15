@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.122
+- Add parity tests that execute the shipped `plugin.js` URL/version helper snippets against `src/youtube-core.mjs`.
+- Expand offline coverage for URL extraction, playlist/timestamp parsing, queue boundaries, loop modes, persisted preference normalisation, and release comparison.
+- Keep `plugin.js` self-contained for the Hermes Desktop loader while guarding duplicated runtime helper logic.
+
 ## v3.121
 - Add one-command GitHub Release publisher using the existing zip and release-note builders.
 - Add dry-run mode so CI can verify the publisher without creating releases.
@@ -66,7 +71,7 @@
 
 ## v3.109.1
 - Fix ShellCheck warning in macOS/Linux installers.
-- Keep CI/release version checks consistent on `v3.118`.
+- Keep CI/release version checks consistent on `v3.109.1`.
 
 ## v3.109
 - Add GitHub Actions CI for push and pull request checks.
@@ -75,7 +80,7 @@
 
 ## v3.108
 - Lock the current product to one canonical release version.
-- Set `plugin.js` to plain `v3.118` with no descriptive suffix.
+- Set `plugin.js` to plain `v3.108` with no descriptive suffix.
 - Update README, changelog, installer filenames, installer verification markers, and release tag versioning to match.
 - Verify Windows, Linux, and macOS install paths as far as this Linux worker can test.
 

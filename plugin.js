@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.121'
+const VERSION = 'v3.122'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -82,6 +82,7 @@ const PLAYER_SIZES = {
   large: { label: 'Large', width: '760px', height: '720px', player: '427px' }
 }
 const QUALITY_LABELS = { auto: 'Auto', tiny: '144p', small: '240p', medium: '360p', large: '480p', hd720: '720p', hd1080: '1080p' }
+const normalisePrefs = (prefs = {}) => ({ ...prefs, playerSize: PLAYER_SIZES[prefs.playerSize] ? prefs.playerSize : 'large', placement: prefs.placement === 'floating' ? 'floating' : 'docked', volume: Math.max(0, Math.min(1, Number.isFinite(Number(prefs.volume)) ? Number(prefs.volume) : 0.9)), loopMode: ['off', 'once', 'inf'].includes(prefs.loopMode) ? prefs.loopMode : 'off' })
 const fmt = seconds => {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0:00'
   const s = Math.floor(seconds % 60).toString().padStart(2, '0')
@@ -582,13 +583,13 @@ const playlistFillScript = '(' + function () {
 }.toString() + ')()'
 
 function YouTubeFloat({ pane = false } = {}) {
-  const prefs = useMemo(readPrefs, [])
+  const prefs = useMemo(() => normalisePrefs(readPrefs()), [])
   const accountPrefs = liveAccountState || prefs.account || {}
   const resume = livePlayerState && Date.now() - livePlayerState.at < SWITCH_RESUME_MS ? livePlayerState : null
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
-  const [playerSize, setPlayerSize] = useState(PLAYER_SIZES[prefs.playerSize] ? prefs.playerSize : 'large')
-  const [placement, setPlacement] = useState(prefs.placement === 'floating' ? 'floating' : 'docked')
+  const [playerSize, setPlayerSize] = useState(prefs.playerSize)
+  const [placement, setPlacement] = useState(prefs.placement)
   const cfg = () => PLAYER_SIZES[playerSize] || PLAYER_SIZES.large
   const mini = playerSize === 'mini'
   const [videoId, setVideoId] = useState(resume?.videoId || null)
@@ -598,7 +599,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [status, setStatus] = useState('Search for a video')
   const [searchUrl, setSearchUrl] = useState(null)
-  const [loopMode, setLoopMode] = useState(['off', 'once', 'inf'].includes(prefs.loopMode) ? prefs.loopMode : 'off')
+  const [loopMode, setLoopMode] = useState(prefs.loopMode)
   const [quality, setQuality] = useState(prefs.quality || 'auto')
   const [qualities, setQualities] = useState(['auto'])
   const [caption, setCaption] = useState(prefs.caption || 'off')
@@ -608,7 +609,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const resumeRef = useRef(resume)
   const resumeStartRef = useRef(resume?.videoId ? resume.current || 0 : 0)
   const resumeStart = resumeStartRef.current
-  const [volume, setVolume] = useState(Number.isFinite(prefs.volume) ? prefs.volume : 1)
+  const [volume, setVolume] = useState(prefs.volume)
   const [volumeOpen, setVolumeOpen] = useState(false)
   const [debugMode, setDebugMode] = useState(prefs.debug === true)
   const [updateBusy, setUpdateBusy] = useState(false)
@@ -1521,7 +1522,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.121 ★',
+        title: 'YouTube v3.122 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

@@ -59,18 +59,8 @@ export function normaliseDashboardRow(key, items, currentVideoId = '') {
   return clean;
 }
 
-export function nextQueueItem({ list, index, queueMode, playlistId }) {
-  const items = Array.isArray(list) ? list : [];
-  const cur = items[index];
-  let next = null;
-  if (cur?.type === 'short') {
-    next = items[index + 1]?.type === 'short' ? items[index + 1] : items.find(i => i.type === 'short') || null;
-  } else if (queueMode === 'playlist') {
-    next = items[index + 1] || null;
-  }
-  if (!next) return { next: null, playlist: null, index: -1 };
-  const nextIndex = items.indexOf(next);
-  return { next, playlist: queueMode === 'playlist' ? playlistId : next.list, index: nextIndex };
+export function nextQueueItem(args) {
+  return autoAdvanceQueueItem(args);
 }
 
 
@@ -97,4 +87,39 @@ export function updateState(current, latestRelease) {
     state: compareVersions(latest, current) > 0 ? 'available' : 'current',
     url: latestRelease.html_url || '',
   };
+}
+
+
+export function previousQueueItem({ list, index }) {
+  const items = Array.isArray(list) ? list : [];
+  const prev = items[index - 1] || null;
+  return { previous: prev, index: prev ? index - 1 : -1 };
+}
+
+export function autoAdvanceQueueItem({ list, index, queueMode, playlistId }) {
+  const items = Array.isArray(list) ? list : [];
+  const cur = items[index];
+  let next = null;
+  if (cur?.type === 'short') {
+    next = items[index + 1]?.type === 'short' ? items[index + 1] : items.find(i => i.type === 'short') || null;
+  } else if (queueMode === 'playlist' && items[index + 1]) {
+    next = items[index + 1];
+  }
+  if (!next) return { next: null, playlist: null, index: -1 };
+  const nextIndex = items.indexOf(next);
+  return { next, playlist: queueMode === 'playlist' ? playlistId : next.list, index: nextIndex };
+}
+
+export function loopAction(mode) {
+  if (mode === 'once') return 'loop-once';
+  if (mode === 'inf') return 'loop-all';
+  return 'loop-off';
+}
+
+export function normalisePrefs(prefs = {}) {
+  const size = ['mini', 'small', 'medium', 'large'].includes(prefs.playerSize) ? prefs.playerSize : 'large';
+  const placement = prefs.placement === 'floating' ? 'floating' : 'docked';
+  const volume = Math.max(0, Math.min(1, Number.isFinite(Number(prefs.volume)) ? Number(prefs.volume) : 0.9));
+  const loopMode = ['off', 'once', 'inf'].includes(prefs.loopMode) ? prefs.loopMode : 'off';
+  return { ...prefs, playerSize: size, placement, volume, loopMode };
 }
