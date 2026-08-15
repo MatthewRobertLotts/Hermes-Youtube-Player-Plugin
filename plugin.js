@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.61-paused-only-restore'
+const VERSION = 'v3.62-native-fullscreen'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -993,6 +993,7 @@ function YouTubeFloat({ pane = false } = {}) {
     setFullscreenBusy(true)
     setLocalFullscreen(v => {
       const next = !v
+      try { void window.hermesDesktop?.setFullscreen?.(next) } catch (e) {}
       try { void playerRef.current?.executeJavaScript(fullscreenFitScript(next), true) } catch (e) {}
       return next
     })
@@ -1146,7 +1147,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.61 ★',
+        title: 'YouTube v3.62 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
