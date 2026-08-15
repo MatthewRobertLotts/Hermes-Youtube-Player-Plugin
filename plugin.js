@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.93-real-accent-borders'
+const VERSION = 'v3.94-scrollbar-border-colour'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1237,7 +1237,8 @@ function YouTubeDashboard() {
   const shorts = (rows.shorts || []).concat(homeItems.filter(x => x.type === 'short'), rawHistory.filter(x => x.type === 'short')).slice(0, 18)
   const playlists = (rows.playlists || []).slice(0, 18)
   const nowTitle = current?.title || localRecent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
-  const btn = 'rounded-full border border-(--ui-accent) bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
+  const DASH_BORDER = 'var(--ui-scrollbar-thumb, #075c45)'
+  const btn = 'rounded-full border bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
   const metric = (label, value) => jsxs('div', { className: 'rounded-xl bg-white/[0.055] px-3 py-2', children: [jsx('div', { className: 'text-lg font-semibold leading-none', children: value }), jsx('div', { className: 'mt-0.5 text-[10px] text-(--ui-text-tertiary)', children: label })] })
   const videoCard = item => jsxs('button', { className: 'w-40 shrink-0 text-left', onClick: () => playFromDashboard(item), title: item.title || item.id, type: 'button', children: [
     jsx('img', { alt: '', className: 'aspect-video w-40 rounded-lg bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
@@ -1259,8 +1260,8 @@ function YouTubeDashboard() {
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: shortsRef, src: searchSrc('shorts', 'shorts') }),
     jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-2xl bg-white/[0.04] p-2', style: { gridTemplateColumns: '580px minmax(0, 1fr)', gap: 12 }, children: [
       jsxs('div', { className: 'grid min-h-0', style: { gridTemplateRows: '290px 104px', gap: 8 }, children: [
-        jsx('img', { alt: '', className: 'h-full min-h-0 w-full rounded-xl bg-black object-contain', style: { border: '1px solid var(--ui-accent)' }, src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
-        jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-xl bg-black/40 px-4 py-2', style: { gridTemplateRows: '20px 22px 32px', rowGap: 8, border: '1px solid var(--ui-accent)' }, children: [
+        jsx('img', { alt: '', className: 'h-full min-h-0 w-full rounded-xl bg-black object-contain', style: { border: '1px solid ' + DASH_BORDER }, src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
+        jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-xl bg-black/40 px-4 py-2', style: { gridTemplateRows: '20px 22px 32px', rowGap: 8, border: '1px solid ' + DASH_BORDER }, children: [
           jsx('div', { className: 'truncate text-sm font-semibold leading-5', children: nowTitle }),
           jsxs('div', { className: 'flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
             jsx('span', { className: 'w-10 shrink-0 tabular-nums', children: fmt(current?.current || 0) }),
@@ -1268,15 +1269,15 @@ function YouTubeDashboard() {
             jsx('span', { className: 'w-10 shrink-0 text-right tabular-nums', children: fmt(current?.duration || 0) })
           ] }),
           jsxs('div', { className: 'grid h-8 items-center gap-2', style: { gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }, children: [
-            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), disabled: !current?.videoId, onClick: () => command('rewind'), type: 'button', children: '-10s' }),
-            jsx('button', { className: 'h-8 w-full rounded-full bg-(--ui-accent) px-3 text-xs font-semibold text-(--ui-accent-contrast) hover:brightness-110 disabled:opacity-50', disabled: !current?.videoId, onClick: () => command('playPause'), type: 'button', children: current?.paused ? 'Play' : 'Pause' }),
-            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), disabled: !current?.videoId, onClick: () => command('forward'), type: 'button', children: '+10s' }),
-            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show' }),
+            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, disabled: !current?.videoId, onClick: () => command('rewind'), type: 'button', children: '-10s' }),
+            jsx('button', { className: 'h-8 w-full rounded-full bg-(--ui-accent) px-3 text-xs font-semibold text-(--ui-accent-contrast) hover:brightness-110 disabled:opacity-50', style: { border: '1px solid ' + DASH_BORDER }, disabled: !current?.videoId, onClick: () => command('playPause'), type: 'button', children: current?.paused ? 'Play' : 'Pause' }),
+            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, disabled: !current?.videoId, onClick: () => command('forward'), type: 'button', children: '+10s' }),
+            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show' }),
             jsx('button', { className: cn(btn, 'h-8 w-full px-0'), onClick: manageAccount, type: 'button', children: state.accountOpen ? 'Close' : (account.signedIn ? 'Account' : 'Sign in') })
           ] })
         ] })
       ] }),
-      jsxs('div', { className: 'grid min-h-0 overflow-hidden rounded-xl bg-black/15 p-3', style: { gridTemplateRows: '1fr auto', border: '1px solid var(--ui-accent)' }, children: [
+      jsxs('div', { className: 'grid min-h-0 overflow-hidden rounded-xl bg-black/15 p-3', style: { gridTemplateRows: '1fr auto', border: '1px solid ' + DASH_BORDER }, children: [
         jsxs('div', { className: 'min-w-0 self-start', children: [
           jsx('div', { className: 'text-[10px] font-semibold uppercase tracking-wide text-(--ui-accent)', children: 'Now playing' }),
           jsx('div', { className: 'mt-1 line-clamp-2 text-base font-semibold leading-snug', children: nowTitle }),
@@ -1341,7 +1342,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.93 ★',
+        title: 'YouTube v3.94 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

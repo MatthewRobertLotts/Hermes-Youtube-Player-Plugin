@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.94
+- Match top borders to scrollbar colour.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.93
 - Use explicit accent borders.
 - Updates plugin source, installer, README, and version page.
