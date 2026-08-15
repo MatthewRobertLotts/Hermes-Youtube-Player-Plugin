@@ -79,8 +79,8 @@ window.dispatchEvent(new CustomEvent('hermes:youtube:api', {
   duration: number,                   // guaranteed, >= 0 (0 until known; best-effort for live)
   description: string | null,         // nullable
   chapters: Array<{startTime,endTime,title}>, // guaranteed, [] when none (best-effort)
-  isShort: boolean,                   // guaranteed
-  isLive: boolean,                    // guaranteed
+  isShort: boolean,                   // best-effort — derived from playlist/queue type when known, else false
+  isLive: boolean,                    // best-effort — the player does not reliably track livestream status (false unless a future version fills it)
   playlistId: string | null           // nullable
 }
 ```
@@ -126,6 +126,10 @@ it is operating against a signed-in account; treat `name` as best-effort.
 { chapters: Array<{ startTime: number, endTime: number | null, title: string | null }> }
 ```
 Best-effort: returns `[]` unless the current video exposes chapters.
+
+> Contract note (v3.141 hardening): `isShort`/`isLive` are explicitly **best-effort**, not
+> guaranteed, because the player's internal state does not reliably carry those flags. A consumer
+> that needs them must treat `false` as "unknown", not "not a short / not live".
 
 ## Controls (safe)
 
@@ -183,6 +187,8 @@ is loaded, a consumer that relied on an event simply receives no further events 
 | Video changes mid-request | Reads snapshot current state; no torn partial object |
 | Queue absent | `getQueue` → empty search queue; never errors |
 | Signed-in state changes | `getAccountState` reflects live state; other reads unaffected |
+| Command hangs (player busy/page reloading) | Reply `player_error` + `control timed out` after 5s |
+| `params` not an object (array/string/null) | `invalid_argument` + `params must be an object` |
 | Unsupported/unknown API version | No reply (silence) — never a wrong-shaped answer |
 | YouTube changes internally | Player adapters isolate it; API shape unchanged |
 

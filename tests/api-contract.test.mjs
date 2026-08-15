@@ -161,3 +161,37 @@ test('v1 exposes no authentication or session internals', () => {
     assert.equal(payload.toLowerCase().includes(bad), false, `exposed ${bad}`);
   }
 });
+
+
+test('v1 params must be an object (v3.141 hardening)', () => {
+  assert.equal(parseApiMessage({ v: 1, method: 'play', params: null }).error, 'invalid params');
+  assert.equal(parseApiMessage({ v: 1, method: 'play', params: ['x'] }).error, 'invalid params');
+  assert.equal(parseApiMessage({ v: 1, method: 'play', params: 'x' }).error, 'invalid params');
+  assert.equal(parseApiMessage({ v: 1, method: 'play', params: 5 }).error, 'invalid params');
+  assert.equal(parseApiMessage({ v: 1, method: 'play', params: {} }).ok, true);
+  assert.equal(parseApiMessage({ v: 1, method: 'play' }).ok, true); // omitted params ok
+});
+
+test('seekTo derives and clamps; safe seek positions allowed (v3.141)', () => {
+  assert.equal(clampSeekSeconds('0').seconds, 0);
+  assert.equal(clampSeekSeconds(0).seconds, 0);
+  assert.equal(clampSeekSeconds(10.5).seconds, 10.5);
+  assert.equal(clampSeekSeconds(999, 10).seconds, 10);
+  // string number accepted; garbage rejected
+  assert.equal(clampSeekSeconds('abc').ok, false);
+  assert.equal(clampSeekSeconds('1e3').seconds, 1000);
+  // whitespace-only string rejected
+  assert.equal(clampSeekSeconds('   ').ok, false);
+});
+
+test('v1 field ladder is stable under unavailable data (v3.141 hardening)', () => {
+  // getCurrentVideo must always include every guaranteed key, never throw.
+  const v = normalizeVideo(null, null);
+  for (const k of ['videoId','canonicalUrl','title','channel','currentTime','duration','description','chapters','isShort','isLive','playlistId']) {
+    assert.ok(k in v, 'missing key ' + k);
+  }
+  assert.equal(v.canonicalUrl, null);
+  assert.equal(v.isShort, false);
+  // isShort is best-effort: a queue item typed short makes it true.
+  assert.equal(normalizeVideo({ videoId: 'x', isShort: true }, {}).isShort, true);
+});

@@ -4,7 +4,7 @@ Use this before tagging a stable release.
 
 ## Version
 
-- [ ] Pick one canonical version, e.g. `v3.140`.
+- [ ] Pick one canonical version, e.g. `v3.141`.
 - [ ] `manifest.json` version matches.
 - [ ] `plugin.js` `VERSION` matches and has no suffix.
 - [ ] README badge/install commands match.

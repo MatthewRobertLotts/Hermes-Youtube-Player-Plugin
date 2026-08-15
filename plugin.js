@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.140'
+const VERSION = 'v3.141'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1592,6 +1592,7 @@ const INT_API_RESPONSE = 'hermes:youtube:api:response'        // player -> consu
 const INT_API_EVENT = 'hermes:youtube:api:event'              // player -> consumer (pushed event)
 const INT_READ = ['getApiInfo', 'getCurrentVideo', 'getPlaybackState', 'getQueue', 'getAccountState', 'getChapters']
 const INT_CONTROL = ['play', 'pause', 'seekTo', 'next', 'previous']
+const INT_CONTROL_TIMEOUT_MS = 5000   // guard so a hung command can never hang a consumer
 let intApiListener = null
 let lastQueueEmitted = ''
 const intFinite = v => {
@@ -1609,17 +1610,20 @@ const apiReadSnapshot = method => {
   if (method === 'getApiInfo') return { plugin: 'youtube-float', apiVersion: INT_API_V, playerVersion: VERSION }
   if (method === 'getCurrentVideo') {
     const s = livePlayerState || {}
+    const q = liveQueueState && Array.isArray(liveQueueState.items) ? liveQueueState.items : []
+    const cur = q[Number.isInteger(liveQueueState && liveQueueState.index) ? liveQueueState.index : -1] || {}
+    const isShort = !!(s.isShort || (cur && cur.type === 'short'))
     return {
       videoId: s.videoId || null,
-      canonicalUrl: s.videoId ? 'https://www.youtube.com/watch?v=' + s.videoId : null,
+      canonicalUrl: s.videoId ? ('https://www.youtube.com/' + (isShort ? 'shorts/' : 'watch?v=') + s.videoId) : null,
       title: typeof s.title === 'string' ? s.title : null,
       channel: typeof s.channel === 'string' ? s.channel : null,
       currentTime: intFinite(s.current) ?? 0,
       duration: intFinite(s.duration) ?? 0,
       description: typeof s.description === 'string' ? s.description : null,
       chapters: [],
-      isShort: !!s.isShort,
-      isLive: !!s.isLive,
+      isShort,
+      isLive: false, // best-effort: the player does not reliably track livestream status
       playlistId: s.playlist || null,
     }
   }
@@ -1651,6 +1655,12 @@ const apiReadSnapshot = method => {
   if (method === 'getChapters') return []
   return null
 }
+const withTimeout = (p, ms) => new Promise((res) => {
+  let done = false
+  const t = window.setTimeout(() => { if (!done) { done = true; res('timeout') } }, ms)
+  Promise.resolve(p).then(v => { if (!done) { done = true; window.clearTimeout(t); res(v) } },
+    () => { if (!done) { done = true; window.clearTimeout(t); res('player_error') } })
+})
 const apiRunControl = async (method, params, id) => {
   if (!dashboardPlayerCommand) return postApiReply(id, { ok: false, code: 'player_closed', error: 'player is closed' })
   try {
@@ -1659,10 +1669,12 @@ const apiRunControl = async (method, params, id) => {
       if (n === null) return postApiReply(id, { ok: false, code: 'invalid_argument', error: 'seekTo requires a finite number of seconds' })
       if (n < 0) return postApiReply(id, { ok: false, code: 'invalid_argument', error: 'seekTo must be non-negative' })
       const dur = intFinite(livePlayerState && livePlayerState.duration) || 0
-      await dashboardPlayerCommand('seek', dur > 0 ? Math.min(n, dur) : n)
+      const r = await withTimeout(dashboardPlayerCommand('seek', dur > 0 ? Math.min(n, dur) : n), INT_CONTROL_TIMEOUT_MS)
+      if (r === 'timeout') return postApiReply(id, { ok: false, code: 'player_error', error: 'control timed out' })
       return postApiReply(id, { ok: true, value: null })
     }
-    await dashboardPlayerCommand(method)
+    const r = await withTimeout(dashboardPlayerCommand(method), INT_CONTROL_TIMEOUT_MS)
+    if (r === 'timeout') return postApiReply(id, { ok: false, code: 'player_error', error: 'control timed out' })
     return postApiReply(id, { ok: true, value: null })
   } catch (e) {
     return postApiReply(id, { ok: false, code: 'player_error', error: 'control failed' })
@@ -1674,8 +1686,12 @@ const apiHandleMessage = async (data) => {
   if (v < 1 || v > INT_API_V) return
   const id = data.id ?? null
   const method = data.method
+  if (data.params !== undefined && (data.params === null || typeof data.params !== 'object' || Array.isArray(data.params))) {
+    return postApiReply(id, { ok: false, code: 'invalid_argument', error: 'params must be an object' })
+  }
+  const params = data.params && typeof data.params === 'object' ? data.params : {}
   if (INT_READ.includes(method)) return postApiReply(id, { ok: true, value: apiReadSnapshot(method) })
-  if (INT_CONTROL.includes(method)) return apiRunControl(method, data.params, id)
+  if (INT_CONTROL.includes(method)) return apiRunControl(method, params, id)
   return postApiReply(id, { ok: false, code: 'unknown_method', error: 'unknown method: ' + method })
 }
 const installIntegrationListener = () => {
@@ -1707,7 +1723,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.140 ★',
+        title: 'YouTube v3.141 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

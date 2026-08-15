@@ -150,3 +150,16 @@ test('plugin.js ships responsive/a11y polish without redesign markers', () => {
   // plugin must not steal keyboard from Hermes chat: only an Escape to exit fullscreen.
   assert.match(plugin, /if \(e\.key === 'Escape'\) setLocalFullscreen\(false\)/);
 });
+
+
+test('plugin.js integration bridge hardens controls (v3.141)', () => {
+  // responds to unknown methods
+  assert.match(plugin, /'unknown method: ' \+ method/);
+  // params must be an object
+  assert.match(plugin, /params must be an object/);
+  // control timeout guard
+  assert.match(plugin, /INT_CONTROL_TIMEOUT_MS/);
+  assert.match(plugin, /control timed out/);
+  // isShort/isLive best-effort, canonicalUrl maps shorts to /shorts/ path
+  assert.match(plugin, /\(isShort \? 'shorts\/' : 'watch\?v='\)/);
+});
