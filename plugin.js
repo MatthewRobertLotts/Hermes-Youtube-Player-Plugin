@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.62-native-fullscreen'
+const VERSION = 'v3.63-bigscreen-mask'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -639,14 +639,11 @@ function YouTubeFloat({ pane = false } = {}) {
   useEffect(() => {
     const webview = playerRef.current
     if (!webview || !videoId || loginPaneRef.current) return undefined
-    const restorePaused = fullscreenPausedRef.current === true
     const applyFit = () => { try { void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true) } catch (e) {} }
-    const pauseIfNeeded = () => { if (restorePaused) { try { void webview.executeJavaScript(driveScript('pause'), true) } catch (e) {} } }
     applyFit()
-    pauseIfNeeded()
-    const a = window.setTimeout(() => { applyFit(); pauseIfNeeded() }, 220)
-    const b = window.setTimeout(() => { applyFit(); pauseIfNeeded() }, 650)
-    const c = window.setTimeout(() => { pauseIfNeeded(); fullscreenPausedRef.current = null; setFullscreenBusy(false) }, 1200)
+    const a = window.setTimeout(applyFit, 120)
+    const b = window.setTimeout(applyFit, 360)
+    const c = window.setTimeout(() => setFullscreenBusy(false), 700)
     return () => { window.clearTimeout(a); window.clearTimeout(b); window.clearTimeout(c) }
   }, [localFullscreen, videoId])
 
@@ -989,11 +986,9 @@ function YouTubeFloat({ pane = false } = {}) {
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   const toggleFullscreen = () => {
     resumeStartRef.current = progress.current || 0
-    fullscreenPausedRef.current = progress.paused === true
     setFullscreenBusy(true)
     setLocalFullscreen(v => {
       const next = !v
-      try { void window.hermesDesktop?.setFullscreen?.(next) } catch (e) {}
       try { void playerRef.current?.executeJavaScript(fullscreenFitScript(next), true) } catch (e) {}
       return next
     })
@@ -1006,7 +1001,6 @@ function YouTubeFloat({ pane = false } = {}) {
   const doubleClickPlayerOverlay = e => {
     e.preventDefault()
     if (clickTimerRef.current) { window.clearTimeout(clickTimerRef.current); clickTimerRef.current = null }
-    fullscreenPausedRef.current = progress.paused === true
     if (videoId) toggleFullscreen()
   }
   // Static-title select: value pinned to a disabled-capable placeholder option carrying the label,
@@ -1024,8 +1018,9 @@ function YouTubeFloat({ pane = false } = {}) {
     children: [jsx('option', { value: '__title', children: label }, '__title'), ...children]
   })
   const playerBoxStyle = { height: cfg().player }
+  const bigScreenActive = localFullscreen || fullscreenBusy
   const fullscreenWebviewStyle = { left: 0, top: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', opacity: fullscreenBusy ? 0 : 1, transform: 'none' }
-  const playerWebviewStyle = localFullscreen ? fullscreenWebviewStyle : (fullscreenBusy ? { opacity: 0 } : undefined)
+  const playerWebviewStyle = bigScreenActive ? fullscreenWebviewStyle : undefined
   const playerWebviewClass = 'absolute inset-0 h-full w-full bg-black'
   const lockedPlayerWebviewClass = 'pointer-events-none absolute inset-0 h-full w-full bg-black'
   const togglePlacement = () => {
@@ -1040,9 +1035,9 @@ function YouTubeFloat({ pane = false } = {}) {
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
     jsx('style', { children: '.hermes-yt-local-fullscreen{position:fixed!important;inset:0!important;z-index:2147483647!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;background:#000!important}' }),
     jsx('div', {
-      className: cn('relative shrink-0 bg-black', localFullscreen && 'hermes-yt-local-fullscreen'),
+      className: cn('relative shrink-0 bg-black', bigScreenActive && 'hermes-yt-local-fullscreen'),
       ref: fullscreenBoxRef,
-      style: localFullscreen ? undefined : playerBoxStyle,
+      style: bigScreenActive ? undefined : playerBoxStyle,
       children: playlistsPane
         ? jsxs('div', { className: 'absolute inset-0', children: [
             jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playlistsPaneRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists), style: playerWebviewStyle }),
@@ -1061,7 +1056,7 @@ function YouTubeFloat({ pane = false } = {}) {
           ? jsxs('div', { className: 'absolute inset-0', children: [
               jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
               jsx('button', { 'aria-label': 'Player click zone: click to play or pause, double-click for fullscreen', className: 'absolute inset-0 z-10 cursor-pointer bg-transparent', onClick: clickPlayerOverlay, onDoubleClick: doubleClickPlayerOverlay, title: 'Click: play/pause. Double-click: fullscreen. Esc exits fullscreen.', type: 'button' }),
-              fullscreenBusy ? jsx('div', { className: 'pointer-events-none absolute inset-0 z-20 grid place-items-center bg-black text-xs text-white/60', children: localFullscreen ? 'Fullscreen…' : 'Returning…' }) : null
+              fullscreenBusy ? jsx('div', { className: 'pointer-events-none absolute inset-0 z-20 grid place-items-center bg-black text-xs text-white/60', children: localFullscreen ? 'Big screen…' : 'Returning…' }) : null
             ] })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
     }),
@@ -1147,7 +1142,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.62 ★',
+        title: 'YouTube v3.63 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

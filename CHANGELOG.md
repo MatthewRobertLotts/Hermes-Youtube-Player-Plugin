@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.63
+- Add fullscreen rollback path.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.62
 - Package the host fullscreen bridge trial.
 - Updates plugin source, installer, README, and version page.
