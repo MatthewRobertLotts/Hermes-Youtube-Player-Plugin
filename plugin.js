@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.50-cap-docked-width'
+const VERSION = 'v3.51-click-fullscreen'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -482,6 +482,8 @@ function YouTubeFloat({ pane = false } = {}) {
   const historyPaneRef = useRef(null)
   const playlistsPaneRef = useRef(null)
   const rootRef = useRef(null)
+  const fullscreenBoxRef = useRef(null)
+  const clickTimerRef = useRef(null)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
   const historyRef = useRef(history)
@@ -936,6 +938,23 @@ function YouTubeFloat({ pane = false } = {}) {
     return () => ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach(a => navigator.mediaSession.setActionHandler(a, null))
   }, [progress.paused, results, currentIndex])
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
+  const toggleFullscreen = () => {
+    const el = fullscreenBoxRef.current
+    try {
+      if (document.fullscreenElement) void document.exitFullscreen()
+      else if (el?.requestFullscreen) void el.requestFullscreen()
+    } catch (e) {}
+  }
+  const clickPlayerOverlay = () => {
+    if (!videoId) return
+    if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = window.setTimeout(() => { clickTimerRef.current = null; void runCommand('playPause') }, 220)
+  }
+  const doubleClickPlayerOverlay = e => {
+    e.preventDefault()
+    if (clickTimerRef.current) { window.clearTimeout(clickTimerRef.current); clickTimerRef.current = null }
+    if (videoId) toggleFullscreen()
+  }
   // Static-title select: value pinned to a disabled-capable placeholder option carrying the label,
   // so the button always shows e.g. "Subs". On focus we sync the DOM value to the real selection so
   // the native popup ticks the active option; on blur we restore the label. Inline width = fixed.
@@ -964,8 +983,10 @@ function YouTubeFloat({ pane = false } = {}) {
   }
   const pinButton = jsx('button', { 'aria-label': placement === 'docked' ? 'Unpin player' : 'Pin player', className: 'grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:text-(--ui-text-primary)', onClick: togglePlacement, title: placement === 'docked' ? 'Pinned: click to float' : 'Floating: click to dock', type: 'button', children: placement === 'docked' ? '📌' : '📍' })
   return jsxs('div', { className: 'relative flex h-full min-h-0 flex-col bg-black/20', ref: rootRef, tabIndex: 0, children: [
+    jsx('style', { children: '.hermes-yt-fullscreen-stage:fullscreen{width:100vw!important;height:100vh!important;background:#000!important}.hermes-yt-fullscreen-stage:fullscreen webview{width:100%!important;height:100%!important}' }),
     jsx('div', {
-      className: 'relative shrink-0 bg-black',
+      className: 'hermes-yt-fullscreen-stage relative shrink-0 bg-black',
+      ref: fullscreenBoxRef,
       style: playerBoxStyle,
       children: playlistsPane
         ? jsxs('div', { className: 'absolute inset-0', children: [
@@ -982,7 +1003,10 @@ function YouTubeFloat({ pane = false } = {}) {
         : (loginPane
         ? jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com', style: playerWebviewStyle })
         : (videoId
-          ? jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle })
+          ? jsxs('div', { className: 'absolute inset-0', children: [
+              jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
+              jsx('button', { 'aria-label': 'Player click zone: click to play or pause, double-click for fullscreen', className: 'absolute inset-0 z-10 cursor-pointer bg-transparent', onClick: clickPlayerOverlay, onDoubleClick: doubleClickPlayerOverlay, title: 'Click: play/pause. Double-click: fullscreen.', type: 'button' })
+            ] })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
     }),
     searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
@@ -1067,7 +1091,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.50 ★',
+        title: 'YouTube v3.51 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

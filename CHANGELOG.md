@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.51
+- Add fullscreen mode iteration.
+- Update plugin source, installer, README, and version page.
+
 ## v3.50
 - Caps the docked pane width with Hermes' native pane `maxWidth` support.
 - Leaves player CSS/scaling untouched after v3.46-v3.48 responsive experiments regressed layout.
