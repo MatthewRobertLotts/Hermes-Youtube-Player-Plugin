@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.71-youtube-dashboard'
+const VERSION = 'v3.72-home-feed-dashboard'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1152,70 +1152,58 @@ function YouTubeDashboard() {
   useEffect(() => { statusListeners.add(setState); setState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
   const open = placement => { if (setPlayerPlacement) setPlayerPlacement(placement); else if (setPlayerOpen) setPlayerOpen(true) }
   const manageAccount = () => { accountPaneRequested = true; if (playerOpenState && playerPlacementState === 'docked' && openAccountPane) openAccountPane(); else open('docked') }
-  const button = 'rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
-  const recent = Array.isArray(history) ? history.slice(0, 8) : []
+  const recent = Array.isArray(history) ? history.slice(0, 12) : []
   const searchList = Array.isArray(searches) ? searches.slice(0, 12) : []
   const nowTitle = current?.title || recent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
-  const chip = text => jsx('button', { className: 'rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/15', onClick: () => open('docked'), type: 'button', children: text }, text)
-  const nav = (label, value, onClick) => jsxs('button', { className: 'flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-(--ui-text-secondary) hover:bg-white/[0.07] hover:text-(--ui-text-primary)', onClick, type: 'button', children: [jsx('span', { children: label }), value != null ? jsx('span', { className: 'text-xs text-(--ui-text-tertiary)', children: value }) : null] }, label)
+  const btn = 'rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
+  const nav = (label, sub, onClick) => jsxs('button', { className: 'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-(--ui-text-secondary) hover:bg-white/[0.07] hover:text-(--ui-text-primary)', onClick, type: 'button', children: [jsx('span', { children: label }), sub ? jsx('span', { className: 'text-xs text-(--ui-text-tertiary)', children: sub }) : null] }, label)
+  const chip = text => jsx('button', { className: 'shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-white/15', onClick: () => open('docked'), type: 'button', children: text }, text)
   const videoCard = item => jsxs('button', { className: 'min-w-0 text-left', onClick: () => open(state.placement || 'docked'), title: item.title || item.id, type: 'button', children: [
-    jsx('img', { alt: '', className: 'aspect-video w-full rounded-xl bg-black object-cover shadow-sm', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
-    jsx('div', { className: 'mt-2 line-clamp-2 text-sm font-medium leading-snug', children: item.title || item.id }),
+    jsx('img', { alt: '', className: 'aspect-video w-full rounded-xl bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
+    jsx('div', { className: 'mt-2 line-clamp-2 text-sm font-semibold leading-snug', children: item.title || item.id }),
     jsx('div', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: item.duration || 'YouTube video' })
   ] }, item.id || item.title)
-  return jsxs('div', { className: 'grid h-full min-h-0 grid-cols-[180px_1fr] overflow-hidden bg-[#0f0f0f] text-(--ui-text-primary)', children: [
-    jsxs('aside', { className: 'min-h-0 border-r border-white/10 p-3', children: [
-      jsx('div', { className: 'px-3 pb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-(--ui-accent)', children: 'Hermes YouTube' }),
-      jsxs('div', { className: 'space-y-1', children: [
-        nav('Home', null, () => open('docked')),
-        nav('History', recent.length, () => open('docked')),
-        nav('Searches', searchList.length, () => open('docked')),
-        nav(account.signedIn ? 'Account' : 'Sign in', state.accountOpen ? 'open' : null, manageAccount)
-      ] }),
-      jsxs('div', { className: 'mt-4 rounded-2xl bg-white/[0.055] p-3', children: [
-        jsx('div', { className: 'text-xs font-semibold', children: state.open ? 'Player open' : 'Player closed' }),
-        jsx('div', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: state.open ? (state.placement === 'floating' ? 'Floating' : 'Docked') : 'Click Dock or Float' }),
-        jsxs('div', { className: 'mt-3 flex gap-2', children: [
-          jsx('button', { className: button, onClick: () => open('docked'), type: 'button', children: 'Dock' }),
-          jsx('button', { className: button, onClick: () => open('floating'), type: 'button', children: 'Float' })
-        ] })
-      ] })
+  return jsxs('div', { className: 'grid h-full min-h-0 grid-rows-[56px_44px_1fr] overflow-hidden bg-[#0f0f0f] text-(--ui-text-primary)', children: [
+    jsxs('header', { className: 'flex items-center gap-4 border-b border-white/10 px-5', children: [
+      jsx('div', { className: 'w-40 shrink-0 text-sm font-semibold tracking-tight', children: '▶ Hermes YouTube' }),
+      jsx('div', { className: 'min-w-0 flex-1 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-sm text-(--ui-text-tertiary)', children: 'Search in the player · terms appear below' }),
+      jsx('button', { className: btn, onClick: manageAccount, type: 'button', children: state.accountOpen ? 'Close account' : (account.signedIn ? 'Manage account' : 'Sign in') }),
+      jsx('button', { className: btn, onClick: () => setPlayerOpen && setPlayerOpen(false), type: 'button', children: 'Close player' })
     ] }),
-    jsxs('main', { className: 'grid min-h-0 grid-rows-[auto_auto_1fr] gap-4 overflow-hidden p-5', children: [
-      jsxs('header', { className: 'flex items-center gap-3', children: [
-        jsx('div', { className: 'min-w-0 flex-1 rounded-full border border-white/10 bg-black/25 px-4 py-2 text-sm text-(--ui-text-tertiary)', children: 'Search from the player; recent terms appear below' }),
-        jsx('button', { className: button, onClick: manageAccount, type: 'button', children: state.accountOpen ? 'Close account' : (account.signedIn ? 'Manage account' : 'Sign in') }),
-        jsx('button', { className: button, onClick: () => setPlayerOpen && setPlayerOpen(false), type: 'button', children: 'Close player' })
+    jsx('div', { className: 'flex items-center gap-2 overflow-hidden border-b border-white/10 px-5', children: ['All', 'Continue watching', 'History', 'Searches', 'Shorts', 'Playlists', account.signedIn ? 'Signed in' : 'Sign in'].map(chip) }),
+    jsxs('div', { className: 'grid min-h-0 grid-cols-[190px_1fr] overflow-hidden', children: [
+      jsxs('aside', { className: 'min-h-0 border-r border-white/10 p-3', children: [
+        nav('Home', '', () => open('docked')),
+        nav('History', recent.length || '', () => open('docked')),
+        nav('Searches', searchList.length || '', () => open('docked')),
+        nav('Player', state.placement === 'floating' ? 'Floating' : 'Docked', () => open(state.placement || 'docked')),
+        nav(account.signedIn ? 'Account' : 'Sign in', state.accountOpen ? 'Open' : '', manageAccount),
+        jsx('div', { className: 'my-3 border-t border-white/10' }),
+        jsxs('div', { className: 'rounded-xl bg-white/[0.055] p-3 text-xs text-(--ui-text-tertiary)', children: [
+          jsx('div', { className: 'font-semibold text-(--ui-text-secondary)', children: state.open ? 'Player open' : 'Player closed' }),
+          jsx('div', { className: 'mt-1', children: state.open ? (state.placement === 'floating' ? 'Floating mode' : 'Docked mode') : 'Open it from the feed' }),
+          jsxs('div', { className: 'mt-3 flex gap-2', children: [jsx('button', { className: btn, onClick: () => open('docked'), type: 'button', children: 'Dock' }), jsx('button', { className: btn, onClick: () => open('floating'), type: 'button', children: 'Float' })] })
+        ] })
       ] }),
-      jsx('div', { className: 'flex gap-2 overflow-hidden', children: ['All', 'Continue', 'History', 'Searches', 'Shorts', 'Playlists', 'Account'].map(chip) }),
-      jsxs('section', { className: 'grid min-h-0 grid-rows-[auto_1fr] gap-4 overflow-hidden', children: [
-        jsxs('div', { className: 'grid gap-4 xl:grid-cols-[1.05fr_0.95fr]', children: [
-          jsxs('div', { className: 'rounded-2xl bg-white/[0.055] p-4', children: [
-            jsx('div', { className: 'mb-3 text-sm font-semibold', children: 'Continue watching' }),
-            jsxs('div', { className: 'flex min-w-0 gap-4', children: [
-              jsx('img', { alt: '', className: 'aspect-video w-56 shrink-0 rounded-xl bg-black object-cover', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
-              jsxs('div', { className: 'min-w-0 self-center', children: [
-                jsx('div', { className: 'line-clamp-2 text-xl font-semibold leading-tight', children: nowTitle }),
-                jsx('div', { className: 'mt-2 text-sm text-(--ui-text-tertiary)', children: current?.videoId ? fmt(current.current || 0) + (current.paused ? ' · paused' : ' · playing') : 'No active video yet' }),
-                jsx('button', { className: cn(button, 'mt-4'), disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show player' })
-              ] })
-            ] })
+      jsxs('main', { className: 'min-h-0 overflow-auto px-6 py-5', children: [
+        jsxs('section', { className: 'mb-6 grid gap-4 lg:grid-cols-[minmax(420px,0.75fr)_1fr]', children: [
+          jsxs('button', { className: 'grid min-w-0 grid-cols-[220px_1fr] gap-4 rounded-2xl bg-white/[0.055] p-3 text-left hover:bg-white/[0.075]', disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: [
+            jsx('img', { alt: '', className: 'aspect-video w-full rounded-xl bg-black object-cover', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
+            jsxs('span', { className: 'min-w-0 self-center', children: [jsx('span', { className: 'block text-xs font-medium uppercase tracking-wide text-(--ui-accent)', children: 'Continue watching' }), jsx('span', { className: 'mt-2 block line-clamp-2 text-xl font-semibold leading-tight', children: nowTitle }), jsx('span', { className: 'mt-2 block text-sm text-(--ui-text-tertiary)', children: current?.videoId ? fmt(current.current || 0) + (current.paused ? ' · paused' : ' · playing') : 'No active video yet' })] })
           ] }),
-          jsxs('div', { className: 'grid gap-4 sm:grid-cols-3 xl:grid-cols-1', children: [
+          jsxs('div', { className: 'grid gap-3 sm:grid-cols-3', children: [
             jsxs('div', { className: 'rounded-2xl bg-white/[0.055] p-4', children: [jsx('div', { className: 'text-2xl font-semibold', children: recent.length }), jsx('div', { className: 'text-xs text-(--ui-text-tertiary)', children: 'recent videos' })] }),
             jsxs('div', { className: 'rounded-2xl bg-white/[0.055] p-4', children: [jsx('div', { className: 'text-2xl font-semibold', children: searchList.length }), jsx('div', { className: 'text-xs text-(--ui-text-tertiary)', children: 'saved searches' })] }),
-            jsxs('div', { className: 'rounded-2xl bg-white/[0.055] p-4', children: [jsx('div', { className: 'truncate text-sm font-medium', children: account.signedIn ? (account.name || 'Signed in') : 'Signed out' }), jsx('div', { className: 'text-xs text-(--ui-text-tertiary)', children: state.accountOpen ? 'account controls open' : 'account controls closed' })] })
+            jsxs('div', { className: 'rounded-2xl bg-white/[0.055] p-4', children: [jsx('div', { className: 'truncate text-sm font-semibold', children: account.signedIn ? (account.name || 'Signed in') : 'Signed out' }), jsx('div', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: state.accountOpen ? 'account controls open' : 'account controls closed' })] })
           ] })
         ] }),
-        jsxs('div', { className: 'grid min-h-0 gap-4 xl:grid-cols-[0.7fr_1.3fr]', children: [
-          jsxs('div', { className: 'min-h-0 rounded-2xl bg-white/[0.055] p-4', children: [
-            jsx('div', { className: 'mb-3 text-sm font-semibold', children: 'Search history' }),
-            searchList.length ? jsx('div', { className: 'flex max-h-full flex-wrap gap-2 overflow-auto', children: searchList.map(item => jsx('button', { className: 'rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15', onClick: () => open('docked'), type: 'button', children: item.term }, item.term)) }) : jsx('p', { className: 'text-sm text-(--ui-text-tertiary)', children: 'Search from the player and terms will appear here.' })
-          ] }),
-          jsxs('div', { className: 'grid min-h-0 grid-rows-[auto_1fr] rounded-2xl bg-white/[0.055] p-4', children: [
-            jsx('div', { className: 'mb-3 text-sm font-semibold', children: 'Recent videos' }),
-            recent.length ? jsx('div', { className: 'grid min-h-0 grid-cols-4 gap-3 overflow-auto pr-1', children: recent.map(videoCard) }) : jsx('p', { className: 'text-sm text-(--ui-text-tertiary)', children: 'Play something in the player and it will appear here.' })
-          ] })
+        jsxs('section', { className: 'mb-6', children: [
+          jsx('h2', { className: 'mb-3 text-base font-semibold', children: 'Recent videos' }),
+          recent.length ? jsx('div', { className: 'grid gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-4', children: recent.map(videoCard) }) : jsx('p', { className: 'text-sm text-(--ui-text-tertiary)', children: 'Play something in the player and it will appear here.' })
+        ] }),
+        jsxs('section', { children: [
+          jsx('h2', { className: 'mb-3 text-base font-semibold', children: 'Search history' }),
+          searchList.length ? jsx('div', { className: 'flex flex-wrap gap-2', children: searchList.map(item => jsx('button', { className: 'rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15', onClick: () => open('docked'), type: 'button', children: item.term }, item.term)) }) : jsx('p', { className: 'text-sm text-(--ui-text-tertiary)', children: 'Search from the player and terms will appear here.' })
         ] })
       ] })
     ] })
@@ -1261,7 +1249,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.71 ★',
+        title: 'YouTube v3.72 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

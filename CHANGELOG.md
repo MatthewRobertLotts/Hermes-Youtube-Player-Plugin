@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.72
+- Test the home-feed dashboard layout.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.71
 - Test the YouTube-home dashboard layout.
 - Updates plugin source, installer, README, and version page.
