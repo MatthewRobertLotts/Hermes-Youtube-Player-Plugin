@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.93
+- Use explicit accent borders.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.92
 - Contain thumbnails and apply accent borders.
 - Updates plugin source, installer, README, and version page.
