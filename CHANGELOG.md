@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.74
+- Separate dashboard shelf data stores.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.73
 - Add compact dashboard shelf rows.
 - Updates plugin source, installer, README, and version page.
