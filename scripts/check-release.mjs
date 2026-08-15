@@ -74,6 +74,9 @@ for (const needle of [`Current-${version}-blue`, `install-youtube-float-${versio
 
 const changelog = read('CHANGELOG.md');
 if (!changelog.split('\n').slice(0, 5).includes(`## ${version}`)) fail('CHANGELOG top entry is not current version');
+const changelogVersions = [...changelog.matchAll(/^## (v\d+\.\d+(?:\.\d+)?)$/gm)].map(m => m[1]);
+const duplicateChangelogVersions = changelogVersions.filter((v, i) => changelogVersions.indexOf(v) !== i);
+if (duplicateChangelogVersions.length) fail(`duplicate CHANGELOG versions: ${[...new Set(duplicateChangelogVersions)].join(', ')}`);
 
 for (const file of ['install-youtube-float.ps1', `install-youtube-float-${version}.ps1`, 'install-youtube-float.sh', `install-youtube-float-${version}.sh`]) {
   const text = read(file);
