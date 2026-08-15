@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.83-history-no-shorts'
+const VERSION = 'v3.84-local-history-source'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -573,20 +573,14 @@ function YouTubeFloat({ pane = false } = {}) {
     try { pluginStorage?.set('history', next) } catch (e) {}
   }
   const showHistory = () => {
-    // Signed in: open a REAL visible history pane in the player area (YouTube serves real data
-    // to a visible webview; it serves an anti-bot stub to the hidden 1px one).
-    if (signedIn) {
-      setQueueMode('search')
-      setStatus('Loading your YouTube history…')
-      setResults([])
-      setHistoryPane(true)
-      return
-    }
+    const clean = historyRef.current.filter(v => v && v.type !== 'short')
+    liveDashboardRows.history = clean
     setQueueMode('search')
     setSearchUrl(null)
-    setResults(historyRef.current)
+    setResults(clean)
     setCurrentIndex(-1)
-    setStatus(historyRef.current.length ? 'History (local) — pick a result' : 'No local history yet. Sign in to see your YouTube history.')
+    setStatus(clean.length ? 'History — pick a result' : 'No local video history yet.')
+    emitPlayerStatus()
   }
   // Load an account feed (Subscriptions / Watch Later / History) without needing a search term.
   // Auto-probes login so the mode resolves correctly as soon as it's picked.
@@ -1178,7 +1172,6 @@ function YouTubeDashboard() {
   const account = liveAccountState || prefs.account || {}
   const current = livePlayerState || null
   const homeRef = useRef(null)
-  const historyRef = useRef(null)
   const subsRef = useRef(null)
   const watchLaterRef = useRef(null)
   const playlistsRef = useRef(null)
@@ -1190,7 +1183,6 @@ function YouTubeDashboard() {
     dashboardBackgroundLoadStarted = true
     const jobs = [
       ['recommended', homeRef],
-      ['history', historyRef],
       account.signedIn ? ['subscriptions', subsRef] : null,
       account.signedIn ? ['watchlater', watchLaterRef] : null,
       account.signedIn ? ['playlists', playlistsRef] : null,
@@ -1228,7 +1220,7 @@ function YouTubeDashboard() {
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
   const homeItems = rows.recommended || []
-  const rawHistory = (rows.history || []).length ? rows.history : localRecent
+  const rawHistory = localRecent
   const recommended = homeItems.filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
   const recent = rawHistory.filter(x => x.type !== 'short').slice(0, 18)
   const subscriptions = (rows.subscriptions || []).slice(0, 18)
@@ -1251,7 +1243,6 @@ function YouTubeDashboard() {
   ] }, title)
   return jsxs('div', { className: 'grid h-full min-h-0 grid-rows-[132px_1fr] overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', children: [
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
-    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyRef, src: cacheBust(ACCOUNT_FEEDS.history) }),
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
@@ -1330,7 +1321,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.83 ★',
+        title: 'YouTube v3.84 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

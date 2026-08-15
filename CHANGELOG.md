@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.84
+- Test the local History source.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.83
 - Exclude Shorts from History rows.
 - Updates plugin source, installer, README, and version page.
