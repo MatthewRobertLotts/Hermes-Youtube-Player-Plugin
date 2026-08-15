@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.100-history-feed-fix'
+const VERSION = 'v3.101-account-history-source'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -88,7 +88,8 @@ const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
 const ACCOUNT_FEEDS = {
   subscriptions: 'https://www.youtube.com/feed/subscriptions',
   watchlater: 'https://www.youtube.com/playlist?list=WL',
-  history: 'https://www.youtube.com/feed/history',
+  // ponytail: /feed/history kept surfacing the current player/miniplayer; /feed/you exposes account History + Playlists.
+  history: 'https://www.youtube.com/feed/you',
   yourplaylists: 'https://www.youtube.com/feed/you'
 }
 function cacheBust(url) { return url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now() }
@@ -1215,7 +1216,7 @@ function YouTubeDashboard() {
           if (clean.length) {
             const rowItems = key === 'playlists'
               ? clean.filter(i => /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) || /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.list || '') || i.type === 'playlist').map(i => ({ ...i, id: (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) ? i.id : (i.list || i.id)), type: 'playlist' }))
-              : (key === 'shorts' ? clean.filter(i => i.type === 'short').map(i => ({ ...i, type: 'short' })) : (key === 'history' ? clean.filter(i => i.type !== 'short') : clean))
+              : (key === 'shorts' ? clean.filter(i => i.type === 'short').map(i => ({ ...i, type: 'short' })) : (key === 'history' ? clean.filter(i => i.type !== 'short' && i.type !== 'playlist') : clean))
             if (rowItems.length && !(key === 'history' && account.signedIn && rowItems.length < 2 && attempt < 10)) {
               liveDashboardRows[key] = rowItems
               emitPlayerStatus()
@@ -1372,7 +1373,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.100 ★',
+        title: 'YouTube v3.101 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

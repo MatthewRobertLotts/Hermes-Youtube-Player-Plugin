@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.101
+- Test History from the account You page.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.100
 - Retry signed History feed loading.
 - Updates plugin source, installer, README, and version page.
