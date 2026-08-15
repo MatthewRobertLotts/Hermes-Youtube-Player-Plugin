@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.105-history-no-overwrite'
+const VERSION = 'v3.106-history-single-writer'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1213,11 +1213,12 @@ function YouTubeDashboard() {
   const [state, setState] = useState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState })
   useEffect(() => { statusListeners.add(setState); setState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
   useEffect(() => {
+    // ponytail: History has one writer: the visible signed-in History pane. Avoid stale module rows from older tests.
+    if (account.signedIn) liveDashboardRows.history = []
     if (dashboardBackgroundLoadStarted) return undefined
     dashboardBackgroundLoadStarted = true
     const jobs = [
       ['recommended', homeRef],
-      ['history', historyFeedRef],
       account.signedIn ? ['subscriptions', subsRef] : null,
       account.signedIn ? ['watchlater', watchLaterRef] : null,
       account.signedIn ? ['playlists', playlistsRef] : null,
@@ -1256,7 +1257,7 @@ function YouTubeDashboard() {
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
   const homeItems = rows.recommended || []
-  const rawHistory = (rows.history || []).length ? rows.history : localRecent
+  const rawHistory = (rows.history || []).length ? rows.history : (account.signedIn ? [] : localRecent)
   const recommended = homeItems.filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
   const recent = rawHistory.filter(x => x.type !== 'short').slice(0, 18)
   const subscriptions = (rows.subscriptions || []).slice(0, 18)
@@ -1292,7 +1293,6 @@ function YouTubeDashboard() {
   ] }, title)
   return jsxs('div', { className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
-    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
@@ -1391,7 +1391,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.105 ★',
+        title: 'YouTube v3.106 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

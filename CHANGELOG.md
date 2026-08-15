@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.106
+- Make History a single-writer flow.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.105
 - Prevent stale History overwrites.
 - Updates plugin source, installer, README, and version page.
