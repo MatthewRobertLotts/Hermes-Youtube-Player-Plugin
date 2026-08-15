@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.95-show-first-control'
+const VERSION = 'v3.96-right-stats-panel'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -419,17 +419,25 @@ const stateScript = '(' + function () {
   let title = ''
   try { title = (p && typeof p.getVideoData === 'function' && p.getVideoData().title) || '' } catch (e) {}
   if (!title) title = (document.querySelector('h1 yt-formatted-string, h1.title')?.textContent || document.title || '').replace(/ - YouTube$/, '').trim()
+  let channel = '', description = '', views = ''
+  try {
+    const pr = window.ytInitialPlayerResponse || {}
+    const vd = pr.videoDetails || {}
+    channel = vd.author || ''
+    description = (vd.shortDescription || '').replace(/\s+/g, ' ').trim()
+    views = vd.viewCount || ''
+  } catch (e) {}
   let playerState = null
   try { if (p && typeof p.getPlayerState === 'function') playerState = p.getPlayerState() } catch (e) {}
   if (p && typeof p.getCurrentTime === 'function') {
     const current = p.getCurrentTime() || 0
     const duration = p.getDuration() || 0
     const paused = p.isPaused ? p.isPaused() : (v ? v.paused : true)
-    return { ok: true, current, duration, paused, ended, endedFlag: flag, videoId: vid, title, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
+    return { ok: true, current, duration, paused, ended, endedFlag: flag, videoId: vid, title, channel, description, views, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
   }
   const current = (v && v.currentTime) || 0
   const duration = (v && v.duration) || 0
-  return { ok: true, current, duration, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid, title, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
+  return { ok: true, current, duration, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid, title, channel, description, views, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
 }.toString() + ')()'
 
 const playlistFillScript = '(' + function () {
@@ -871,7 +879,7 @@ function YouTubeFloat({ pane = false } = {}) {
         if (!r || !r.ok) return
         if (!interacting) setProgress({ current: r.current, duration: r.duration, paused: r.paused, videoId: r.videoId })
         if (fullscreenBusy && Date.now() > fullscreenMaskUntilRef.current && (r.ready || r.paused)) setFullscreenBusy(false)
-        if (r.videoId || videoId) { livePlayerState = { at: Date.now(), current: r.current || 0, duration: r.duration || 0, paused: r.paused, playlist, title: r.title || livePlayerState?.title || '', thumb: livePlayerState?.thumb || '', videoId: r.videoId || videoId }; emitPlayerStatus() }
+        if (r.videoId || videoId) { livePlayerState = { at: Date.now(), channel: r.channel || livePlayerState?.channel || '', current: r.current || 0, description: r.description || livePlayerState?.description || '', duration: r.duration || 0, paused: r.paused, playlist, title: r.title || livePlayerState?.title || '', thumb: livePlayerState?.thumb || '', videoId: r.videoId || videoId, views: r.views || livePlayerState?.views || '' }; emitPlayerStatus() }
         const list = resultsRef.current
         const expected = list[indexRef.current]?.id
         // YouTube's own up-next can start a video we never asked for before our poll notices the
@@ -1237,9 +1245,13 @@ function YouTubeDashboard() {
   const shorts = (rows.shorts || []).concat(homeItems.filter(x => x.type === 'short'), rawHistory.filter(x => x.type === 'short')).slice(0, 18)
   const playlists = (rows.playlists || []).slice(0, 18)
   const nowTitle = current?.title || localRecent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
+  const nowChannel = current?.channel || 'Unknown channel'
+  const nowDescription = current?.description || 'Description will appear when the video page exposes it.'
+  const nowViews = current?.views ? Number(current.views).toLocaleString() : '—'
   const DASH_BORDER = 'var(--ui-scrollbar-thumb, #075c45)'
   const btn = 'rounded-full border bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
   const metric = (label, value) => jsxs('div', { className: 'rounded-xl bg-white/[0.055] px-3 py-2', children: [jsx('div', { className: 'text-lg font-semibold leading-none', children: value }), jsx('div', { className: 'mt-0.5 text-[10px] text-(--ui-text-tertiary)', children: label })] })
+  const infoBox = (label, value) => jsxs('div', { className: 'min-w-0 rounded-xl bg-white/[0.055] px-3 py-2', style: { border: '1px solid ' + DASH_BORDER }, children: [jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: label }), jsx('div', { className: 'mt-1 truncate text-sm font-semibold', children: value })] })
   const videoCard = item => jsxs('button', { className: 'w-40 shrink-0 text-left', onClick: () => playFromDashboard(item), title: item.title || item.id, type: 'button', children: [
     jsx('img', { alt: '', className: 'aspect-video w-40 rounded-lg bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
     jsx('div', { className: 'mt-1 line-clamp-2 text-xs font-medium leading-snug', children: item.title || item.id }),
@@ -1277,13 +1289,23 @@ function YouTubeDashboard() {
           ] })
         ] })
       ] }),
-      jsxs('div', { className: 'grid min-h-0 overflow-hidden rounded-xl bg-black/15 p-3', style: { gridTemplateRows: '1fr auto', border: '1px solid ' + DASH_BORDER }, children: [
-        jsxs('div', { className: 'min-w-0 self-start', children: [
+      jsxs('div', { className: 'grid min-h-0 overflow-hidden rounded-xl bg-black/15 p-3', style: { gridTemplateRows: '72px 86px minmax(0, 1fr) 58px', gap: 10, border: '1px solid ' + DASH_BORDER }, children: [
+        jsxs('div', { className: 'min-w-0', children: [
           jsx('div', { className: 'text-[10px] font-semibold uppercase tracking-wide text-(--ui-accent)', children: 'Now playing' }),
-          jsx('div', { className: 'mt-1 line-clamp-2 text-base font-semibold leading-snug', children: nowTitle }),
-          jsx('div', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: current?.videoId ? (current.paused ? 'Paused' : 'Playing') : 'No active video yet' })
+          jsx('div', { className: 'mt-1 line-clamp-1 text-base font-semibold leading-snug', children: nowTitle }),
+          jsx('div', { className: 'mt-1 truncate text-xs text-(--ui-text-tertiary)', children: current?.videoId ? (current.paused ? 'Paused' : 'Playing') : 'No active video yet' })
         ] }),
-        jsxs('div', { className: 'grid grid-cols-4 gap-2 self-end', children: [
+        jsxs('div', { className: 'grid grid-cols-4 gap-2', children: [
+          infoBox('Channel', nowChannel),
+          infoBox('Duration', fmt(current?.duration || 0)),
+          infoBox('Views', nowViews),
+          infoBox('List', current?.playlist ? 'Playlist' : 'Single')
+        ] }),
+        jsxs('div', { className: 'min-h-0 rounded-xl bg-white/[0.045] px-3 py-2', style: { border: '1px solid ' + DASH_BORDER }, children: [
+          jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: 'Description' }),
+          jsx('div', { className: 'mt-1 line-clamp-5 text-xs leading-snug text-(--ui-text-secondary)', children: nowDescription })
+        ] }),
+        jsxs('div', { className: 'grid grid-cols-4 gap-2', children: [
           metric('Recommended', recommended.length),
           metric('History', recent.length),
           metric('Playlists', playlists.length),
@@ -1342,7 +1364,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.95 ★',
+        title: 'YouTube v3.96 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.96
+- Add the dashboard stats panel.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.95
 - Put Show first in dashboard controls.
 - Updates plugin source, installer, README, and version page.
