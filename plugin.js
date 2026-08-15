@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.76-home-recommendations'
+const VERSION = 'v3.77-dashboard-autoload'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -32,6 +32,7 @@ let liveDashboardResults = []
 let liveDashboardRows = { history: [], playlists: [], shorts: [], subscriptions: [], videos: [], watchlater: [] }
 let dashboardLoadFeed = null
 let dashboardPlayerCommand = null
+let dashboardAutoLoadStarted = false
 const statusListeners = new Set()
 const emitPlayerStatus = () => statusListeners.forEach(fn => { try { fn({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }) } catch (e) {} })
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
@@ -1162,6 +1163,17 @@ function YouTubeDashboard() {
   const current = livePlayerState || null
   const [state, setState] = useState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState })
   useEffect(() => { statusListeners.add(setState); setState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
+  useEffect(() => {
+    if (dashboardAutoLoadStarted || !dashboardLoadFeed) return undefined
+    dashboardAutoLoadStarted = true
+    const jobs = []
+    if (!(liveDashboardRows.recommended || []).length) jobs.push('recommended')
+    if (!(liveDashboardRows.history || []).length) jobs.push('history')
+    if (account.signedIn && !(liveDashboardRows.subscriptions || []).length) jobs.push('subscriptions')
+    if (account.signedIn && !(liveDashboardRows.watchlater || []).length) jobs.push('watchlater')
+    jobs.forEach((key, index) => window.setTimeout(() => { try { dashboardLoadFeed(key) } catch (e) {} }, index * 4200))
+    return undefined
+  }, [])
   const open = placement => { if (setPlayerPlacement) setPlayerPlacement(placement); else if (setPlayerOpen) setPlayerOpen(true) }
   const manageAccount = () => { accountPaneRequested = true; if (playerOpenState && playerPlacementState === 'docked' && openAccountPane) openAccountPane(); else open('docked') }
   const loadRow = key => { open('docked'); if (dashboardLoadFeed) window.setTimeout(() => dashboardLoadFeed(key), 60) }
@@ -1263,7 +1275,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.76 ★',
+        title: 'YouTube v3.77 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

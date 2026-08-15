@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.77
+- Test dashboard shelf autoloading.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.76
 - Load recommendations from YouTube Home.
 - Updates plugin source, installer, README, and version page.

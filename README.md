@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
-  <img src="https://img.shields.io/badge/Current-v3.76-blue" alt="Current v3.76">
+  <img src="https://img.shields.io/badge/Current-v3.77-blue" alt="Current v3.77">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
 </p>
 
@@ -139,11 +139,11 @@ Playlist results open into a playable queue, autoplay the first item, and roll t
 2. From PowerShell in the repo folder, run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.76.ps1
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.77.ps1
 ```
 
 3. Fully quit and reopen Hermes Desktop.
-4. Confirm the pane title shows **YouTube v3.76 ★**.
+4. Confirm the pane title shows **YouTube v3.77 ★**.
 
 The installer writes to both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`, plus profile plugin folders when present.
 
