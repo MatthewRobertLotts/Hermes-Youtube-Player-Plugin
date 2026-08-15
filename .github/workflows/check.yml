@@ -28,6 +28,8 @@ jobs:
         run: |
           version=$(node -p "require('./manifest.json').version")
           shellcheck install-youtube-float.sh "install-youtube-float-${version}.sh"
+      - name: Release zip package
+        run: python3 scripts/build-release-zip.py --output /tmp/youtube-float-release.zip --check
       - name: PowerShell installer syntax
         shell: pwsh
         run: |

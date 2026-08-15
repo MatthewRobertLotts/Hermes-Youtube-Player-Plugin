@@ -25,6 +25,7 @@ const required = [
   `install-youtube-float-${version}.sh`,
   'src/youtube-core.mjs',
   'tests/youtube-core.test.mjs',
+  'scripts/build-release-zip.py',
   'SECURITY.md',
   '.github/ISSUE_TEMPLATE/bug_report.yml',
   'TROUBLESHOOTING.md',

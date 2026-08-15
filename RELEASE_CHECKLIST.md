@@ -4,7 +4,7 @@ Use this before tagging a stable release.
 
 ## Version
 
-- [ ] Pick one canonical version, e.g. `v3.117`.
+- [ ] Pick one canonical version, e.g. `v3.118`.
 - [ ] `manifest.json` version matches.
 - [ ] `plugin.js` `VERSION` matches and has no suffix.
 - [ ] README badge/install commands match.
@@ -14,6 +14,7 @@ Use this before tagging a stable release.
 ## Checks
 
 - [ ] `node scripts/check-release.mjs`
+- [ ] `python3 scripts/build-release-zip.py --check`
 - [ ] `node --test tests/*.test.mjs`
 - [ ] `sh -n install-youtube-float.sh`
 - [ ] `sh -n install-youtube-float-<version>.sh`
