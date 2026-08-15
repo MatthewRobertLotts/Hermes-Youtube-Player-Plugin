@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.107.3
+- Refresh README feature copy with stronger presentation and emojis.
+- Move shipped dashboard work out of the roadmap.
+- Clarify limitations without listing intentional lock-down behavior as a bug.
+
 ## v3.107.2
 - Update README description, feature list, known bugs, and roadmap to reflect the current dashboard/player work.
 - Preserve the existing landing-page format and screenshot layout.
