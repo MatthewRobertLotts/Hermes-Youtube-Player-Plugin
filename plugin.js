@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.102-restore-confirmed-history'
+const VERSION = 'v3.103-myactivity-history'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -88,7 +88,7 @@ const SP_FILTERS = { shorts: 'EgIQCQ%253D%253D', playlists: 'EgIQAw%253D%253D' }
 const ACCOUNT_FEEDS = {
   subscriptions: 'https://www.youtube.com/feed/subscriptions',
   watchlater: 'https://www.youtube.com/playlist?list=WL',
-  history: 'https://www.youtube.com/feed/history',
+  history: 'https://myactivity.google.com/product/youtube',
   yourplaylists: 'https://www.youtube.com/feed/you'
 }
 function cacheBust(url) { return url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now() }
@@ -204,6 +204,19 @@ const scrapeSearchScript = '(' + function () {
     for (const k in o) walk(o[k])
   }
   try { walk(window.ytInitialData) } catch (e) {}
+  // ponytail: Google My Activity is the account-history source; it exposes plain YouTube watch links.
+  try {
+    for (const a of Array.from(document.querySelectorAll('a[href*="youtube.com/watch"],a[href*="youtu.be/"]'))) {
+      const href = a.href || ''
+      const id = (href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || href.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || [])[1]
+      if (!id) continue
+      const box = a.closest('[role="listitem"], article, div') || a
+      let title = (a.textContent || box.textContent || '').replace(/\s+/g, ' ').trim()
+      title = title.replace(/^Watched\s+/i, '').replace(/\s+-\s+YouTube$/i, '').trim()
+      if (!title || title.length < 3) title = id
+      push(id, title, 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg', '', 'video', null)
+    }
+  } catch (e) {}
   return { items: out, renderers: keyCount, page: { title: document.title || '', url: location.href || '', hasData: !!window.ytInitialData, bodyLen: (document.body ? document.body.innerHTML.length : 0), ytLen: window.ytInitialData ? JSON.stringify(window.ytInitialData).length : 0 } }
 }.toString() + ')()'
 
@@ -1273,7 +1286,7 @@ function YouTubeDashboard() {
   ] }, title)
   return jsxs('div', { className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
-    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history) }),
+    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
@@ -1372,7 +1385,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.102 ★',
+        title: 'YouTube v3.103 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

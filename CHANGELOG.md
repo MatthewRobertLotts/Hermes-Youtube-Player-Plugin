@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.103
+- Test History from Google My Activity.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.102
 - Restore the confirmed History implementation.
 - Updates plugin source, installer, README, and version page.
