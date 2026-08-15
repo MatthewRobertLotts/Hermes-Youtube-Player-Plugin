@@ -3,7 +3,7 @@ set -eu
 
 SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SOURCE="$SOURCE_DIR/plugin.js"
-MARKER="v3.107-youtubei-history"
+MARKER="v3.108"
 
 if [ ! -f "$SOURCE" ]; then
   echo "plugin.js not found next to installer" >&2
@@ -43,9 +43,9 @@ printf '%s
   fi
   written="$written
  - $target"
-  printf 'Installed YouTube Float v3.107 to %s
+  printf 'Installed YouTube Float v3.108 to %s
 ' "$target"
 done
 
-printf 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.107 ★.
+printf 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.108 ★.
 '

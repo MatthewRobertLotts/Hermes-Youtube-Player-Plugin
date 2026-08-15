@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.108
+- Lock the current product to one canonical release version.
+- Set `plugin.js` to plain `v3.108` with no descriptive suffix.
+- Update README, changelog, installer filenames, installer verification markers, and release tag versioning to match.
+- Verify Windows, Linux, and macOS install paths as far as this Linux worker can test.
+
 ## v3.107.4
 - Add macOS/Linux shell installers alongside the Windows PowerShell installer.
 - Update README install instructions for Windows, macOS, and Linux.

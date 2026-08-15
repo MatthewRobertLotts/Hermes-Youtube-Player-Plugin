@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
-  <img src="https://img.shields.io/badge/Current-v3.107-blue" alt="Current v3.107">
+  <img src="https://img.shields.io/badge/Current-v3.108-blue" alt="Current v3.108">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
 </p>
 
@@ -143,7 +143,7 @@ Playlist results open into a playable queue, autoplay the first item, and roll t
 ### Windows PowerShell
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.107.ps1
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.108.ps1
 ```
 
 Writes to `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`, plus profile plugin folders when present.
@@ -151,14 +151,14 @@ Writes to `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\des
 ### macOS / Linux
 
 ```bash
-chmod +x ./install-youtube-float-v3.107.sh
-./install-youtube-float-v3.107.sh
+chmod +x ./install-youtube-float-v3.108.sh
+./install-youtube-float-v3.108.sh
 ```
 
 Writes to `~/.hermes/desktop-plugins`, `$HERMES_HOME/desktop-plugins` when set, macOS `~/Library/Application Support/hermes/desktop-plugins`, and profile plugin folders when present.
 
 3. Fully quit and reopen Hermes Desktop.
-4. Confirm the pane title shows **YouTube v3.107 ★**.
+4. Confirm the pane title shows **YouTube v3.108 ★**.
 
 ---
 
