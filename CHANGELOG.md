@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.102
+- Restore the confirmed History implementation.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.101
 - Test History from the account You page.
 - Updates plugin source, installer, README, and version page.
