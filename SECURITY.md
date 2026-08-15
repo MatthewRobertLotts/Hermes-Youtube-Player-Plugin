@@ -64,3 +64,22 @@ The locked, non-browsable playback surface is intentional product design: it kee
 Debug mode is off by default. When enabled, diagnostics record labelled plugin events such as `History -> youtubei -> parser failed`. Diagnostics include plugin version and platform/user-agent context, and redact sensitive-looking keys before copying.
 
 Never paste diagnostics publicly if you manually add private information to them.
+
+
+## Updater trust model
+
+The in-plugin updater checks GitHub Releases only. It does not update from `main` or arbitrary URLs.
+
+Before any replacement path may run, updater logic validates:
+
+- latest stable tag is a version tag;
+- release URL is under the expected GitHub repository;
+- artifact name matches `youtube-float-desktop-plugin-<version>.zip`;
+- artifact URL is under the matching release tag;
+- artifact size is positive and below the strict maximum;
+- downloaded plugin metadata has the expected plugin ID and version;
+- downloaded plugin source looks like the Hermes YouTube Player plugin.
+
+The current Hermes plugin runtime does not expose a documented filesystem/update bridge to this plugin. Without that explicit bridge, the updater validates the release and opens the GitHub Release page for manual installer use. It must not hack around the sandbox or overwrite files directly.
+
+Failures leave the existing installed version untouched and log redacted diagnostics.

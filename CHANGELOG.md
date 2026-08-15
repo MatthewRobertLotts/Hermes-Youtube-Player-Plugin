@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.124
+- Upgrade update checks into a safety-first updater contract based on GitHub Releases stable artifacts.
+- Validate release origin, artifact name/type/size, plugin ID, downloaded version, and fallback behavior before any install path.
+- Document updater trust boundaries and keep automatic replacement disabled unless Hermes exposes an explicit updater bridge.
+
 ## v3.123
 - Add contributor setup, reload, validation, diagnostics, and safe bug-reporting documentation.
 - Add architecture documentation for Hermes lifecycle, adapters, queue/state, trust boundaries, diagnostics, and release tooling.

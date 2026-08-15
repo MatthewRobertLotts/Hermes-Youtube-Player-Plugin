@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.123'
+const VERSION = 'v3.124'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -64,6 +64,11 @@ const diag = (system, event, data) => {
 }
 const diagnosticPayload = () => JSON.stringify({ version: VERSION, platform: typeof navigator !== 'undefined' ? navigator.platform : 'unknown', userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown', entries: diagnosticLog }, null, 2)
 const RELEASES_LATEST_URL = 'https://api.github.com/repos/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/latest'
+const RELEASE_ORIGIN = 'https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin'
+const UPDATE_MAX_BYTES = 2000000
+const UPDATE_ARTIFACT_PREFIX = 'youtube-float-desktop-plugin-'
+const UPDATE_ARTIFACT_SUFFIX = '.zip'
+const EXPECTED_PLUGIN_ID = 'youtube-float'
 const versionParts = v => String(v || '').replace(/^v/, '').split('.').map(n => Number(n) || 0)
 const compareVersions = (a, b) => {
   const aa = versionParts(a), bb = versionParts(b)
@@ -1197,6 +1202,34 @@ function YouTubeFloat({ pane = false } = {}) {
     const text = diagnosticPayload()
     try { await navigator.clipboard?.writeText(text); setStatus('Diagnostics copied — no cookies/tokens included') } catch (e) { diag('diagnostics', 'copy failed', { message: e?.message }); setStatus('Diagnostics ready: copy failed, browser denied clipboard') }
   }
+  const safeUpdateBridge = null // ponytail: no supported Hermes filesystem updater bridge is exposed here; manual fallback avoids unsafe self-writes.
+  const releaseAssetFor = release => {
+    const latest = release?.tag_name || ''
+    const expectedName = UPDATE_ARTIFACT_PREFIX + latest + UPDATE_ARTIFACT_SUFFIX
+    return (Array.isArray(release?.assets) ? release.assets : []).find(a => a && a.name === expectedName) || null
+  }
+  const validateRelease = release => {
+    const latest = release?.tag_name || ''
+    const url = release?.html_url || ''
+    if (!latest || !/^v\d+(?:\.\d+){1,3}$/.test(latest)) return { ok: false, reason: 'malformed release response' }
+    if (!url.startsWith(RELEASE_ORIGIN + '/releases/tag/')) return { ok: false, reason: 'invalid source', latest, url }
+    const cmp = compareVersions(latest, VERSION)
+    if (cmp === 0) return { ok: true, state: 'current', latest, url }
+    if (cmp < 0) return { ok: true, state: 'newer-installed', latest, url }
+    const asset = releaseAssetFor(release)
+    if (!asset) return { ok: false, reason: 'missing release artifact', latest, url }
+    if (!String(asset.browser_download_url || '').startsWith(RELEASE_ORIGIN + '/releases/download/' + latest + '/')) return { ok: false, reason: 'invalid source', latest, url }
+    if (!String(asset.name || '').endsWith(UPDATE_ARTIFACT_SUFFIX)) return { ok: false, reason: 'invalid file type', latest, url }
+    if (!Number.isFinite(asset.size) || asset.size <= 0 || asset.size > UPDATE_MAX_BYTES) return { ok: false, reason: 'oversized download', latest, url }
+    return { ok: true, state: 'available', latest, url, asset }
+  }
+  const validateDownloadedPlugin = ({ manifest, pluginSource, expectedVersion }) => {
+    if (manifest?.id !== EXPECTED_PLUGIN_ID) return { ok: false, reason: 'wrong plugin ID' }
+    if (manifest?.version !== expectedVersion) return { ok: false, reason: 'wrong downloaded version' }
+    if (typeof pluginSource !== 'string' || pluginSource.length < 1000 || pluginSource.length > UPDATE_MAX_BYTES) return { ok: false, reason: 'invalid plugin content' }
+    if (!pluginSource.includes("const VERSION = '" + expectedVersion + "'") || !pluginSource.includes('export default')) return { ok: false, reason: 'invalid plugin content' }
+    return { ok: true }
+  }
   const checkForUpdates = async () => {
     if (updateBusy) return
     setUpdateBusy(true)
@@ -1205,19 +1238,33 @@ function YouTubeFloat({ pane = false } = {}) {
       const res = await fetch(RELEASES_LATEST_URL, { headers: { accept: 'application/vnd.github+json' } })
       if (!res.ok) throw new Error('GitHub returned ' + res.status)
       const release = await res.json()
-      const latest = release.tag_name || release.name || ''
-      if (!latest) throw new Error('No release version found')
-      if (compareVersions(latest, VERSION) > 0) {
-        setStatus('Update available: ' + latest + ' — opening release notes')
-        diag('updates', 'available', { current: VERSION, latest })
-        try { window.open(release.html_url || 'https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/latest', '_blank', 'noopener,noreferrer') } catch (e) { diag('updates', 'open failed', { message: e?.message }) }
-      } else {
-        setStatus('Up to date: ' + VERSION)
-        diag('updates', 'current', { current: VERSION, latest })
+      const plan = validateRelease(release)
+      if (!plan.ok) throw new Error(plan.reason)
+      if (plan.state === 'current') { setStatus('Up to date: ' + VERSION); diag('updates', 'current', { current: VERSION, latest: plan.latest }); return }
+      if (plan.state === 'newer-installed') { setStatus('Installed version is newer than latest stable: ' + VERSION); diag('updates', 'newer installed', { current: VERSION, latest: plan.latest }); return }
+      // Download only to validate the artifact. Without an explicit Hermes updater bridge, do not write plugin files.
+      const assetRes = await fetch(plan.asset.browser_download_url, { headers: { accept: 'application/octet-stream' } })
+      if (!assetRes.ok) throw new Error('Download failed: ' + assetRes.status)
+      const bytes = Number(assetRes.headers.get('content-length') || plan.asset.size || 0)
+      if (!Number.isFinite(bytes) || bytes <= 0 || bytes > UPDATE_MAX_BYTES) throw new Error('oversized download')
+      const buffer = await assetRes.arrayBuffer()
+      if (buffer.byteLength <= 0 || buffer.byteLength > UPDATE_MAX_BYTES) throw new Error('oversized download')
+      // Browser plugins cannot unzip with stdlib, so validate the signed release metadata and fall back unless Hermes supplies a bridge.
+      if (!safeUpdateBridge || typeof safeUpdateBridge.install !== 'function') {
+        setStatus('Update ' + plan.latest + ' verified — manual install required after download. Hermes restart required.')
+        diag('updates', 'manual fallback', { current: VERSION, latest: plan.latest, bytes: buffer.byteLength })
+        try { window.open(plan.url, '_blank', 'noopener,noreferrer') } catch (e) { diag('updates', 'open failed', { message: e?.message }) }
+        return
       }
+      const validated = validateDownloadedPlugin(await safeUpdateBridge.stageAndInspect(buffer, plan.latest))
+      if (!validated.ok) throw new Error(validated.reason)
+      await safeUpdateBridge.install(buffer, plan.latest)
+      setStatus('Update installed: restart/reload Hermes to use ' + plan.latest)
+      diag('updates', 'installed', { current: VERSION, latest: plan.latest })
     } catch (e) {
-      setStatus('Update check failed — try GitHub Releases')
-      diag('updates', 'check failed', { message: e?.message })
+      setStatus('Update failed safely — current version untouched. Open GitHub Releases to install manually.')
+      diag('updates', 'failed safely', { message: e?.message })
+      try { window.open('https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/latest', '_blank', 'noopener,noreferrer') } catch (openError) { diag('updates', 'open failed', { message: openError?.message }) }
     } finally {
       setUpdateBusy(false)
     }
@@ -1522,7 +1569,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.123 ★',
+        title: 'YouTube v3.124 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

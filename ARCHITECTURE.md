@@ -83,7 +83,7 @@ Debug diagnostics are opt-in. `diag()` records bounded labelled events and `diag
 
 ### Updater and release logic
 
-The in-plugin update check calls GitHub Releases latest metadata and opens the release page when a newer version exists. Repository scripts build the zip, generate release notes from CHANGELOG, validate consistency, and dry-run publication.
+The in-plugin update check calls GitHub Releases latest metadata, validates the tagged zip artifact, downloads it only into memory for validation, and falls back to the release page unless Hermes exposes an explicit updater/write bridge. Repository scripts build the zip, generate release notes from CHANGELOG, validate consistency, and dry-run publication.
 
 ## Trust boundary
 

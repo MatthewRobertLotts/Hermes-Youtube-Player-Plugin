@@ -12,7 +12,11 @@ import {
   playlistIdFrom,
   previousQueueItem,
   startSecondsFrom,
+  UPDATE_CONTRACT,
   updateState,
+  updaterPlan,
+  validateDownloadedPlugin,
+  validateRelease,
   videoIdFrom,
   watchUrl,
 } from '../src/youtube-core.mjs';
@@ -107,4 +111,21 @@ test('compares release versions and update state', () => {
   assert.equal(compareVersions('v3.113', 'v3.114'), -1);
   assert.deepEqual(updateState('v3.114', { tag_name: 'v3.115', html_url: 'https://example.test/release' }), { current: 'v3.114', latest: 'v3.115', state: 'available', url: 'https://example.test/release' });
   assert.deepEqual(updateState('v3.115', { tag_name: 'v3.115' }), { current: 'v3.115', latest: 'v3.115', state: 'current', url: '' });
+});
+
+
+test('validates safe updater contracts', () => {
+  const asset = tag => ({ name: `youtube-float-desktop-plugin-${tag}.zip`, browser_download_url: `https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/download/${tag}/youtube-float-desktop-plugin-${tag}.zip`, size: 37000 });
+  const release = tag => ({ tag_name: tag, html_url: `https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/releases/tag/${tag}`, assets: [asset(tag)] });
+  assert.equal(validateRelease('v3.124', release('v3.124')).state, 'current');
+  assert.equal(validateRelease('v3.123', release('v3.124')).state, 'available');
+  assert.equal(validateRelease('v3.125', release('v3.124')).state, 'newer-installed');
+  assert.equal(validateRelease('v3.123', {}).reason, 'malformed release response');
+  assert.equal(validateRelease('v3.123', { ...release('v3.124'), html_url: 'https://evil.test/releases/tag/v3.124' }).reason, 'invalid source');
+  assert.equal(validateRelease('v3.123', { ...release('v3.124'), assets: [{ ...asset('v3.124'), size: UPDATE_CONTRACT.maxBytes + 1 }] }).reason, 'oversized download');
+  assert.equal(validateDownloadedPlugin({ manifest: { id: 'wrong', version: 'v3.124' }, pluginSource: 'x'.repeat(2000), expectedVersion: 'v3.124' }).reason, 'wrong plugin ID');
+  assert.equal(validateDownloadedPlugin({ manifest: { id: UPDATE_CONTRACT.pluginId, version: 'v3.123' }, pluginSource: 'x'.repeat(2000), expectedVersion: 'v3.124' }).reason, 'wrong downloaded version');
+  assert.equal(validateDownloadedPlugin({ manifest: { id: UPDATE_CONTRACT.pluginId, version: 'v3.124' }, pluginSource: "const VERSION = 'v3.124'\nexport default {}\n".repeat(80), expectedVersion: 'v3.124' }).ok, true);
+  assert.equal(updaterPlan({ current: 'v3.123', release: release('v3.124'), hasWriteBridge: false }).action, 'fallback');
+  assert.equal(updaterPlan({ current: 'v3.123', release: release('v3.124'), hasWriteBridge: true, writeOk: false }).reason, 'failed write');
 });

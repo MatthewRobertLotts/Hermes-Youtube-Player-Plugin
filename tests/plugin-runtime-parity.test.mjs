@@ -73,3 +73,12 @@ test('plugin.js keeps the runtime queue semantics the helper tests document', ()
   assert.match(plugin, /qm === 'playlist' && list\[indexRef\.current \+ 1\]/);
   assert.match(plugin, /setStatus\('End of list — paused'\)/);
 });
+
+
+test('plugin.js safe updater falls back without an explicit Hermes write bridge', () => {
+  assert.match(plugin, /const safeUpdateBridge = null/);
+  assert.match(plugin, /UPDATE_MAX_BYTES = 2000000/);
+  assert.match(plugin, /EXPECTED_PLUGIN_ID = 'youtube-float'/);
+  assert.match(plugin, /manual install required/);
+  assert.match(plugin, /current version untouched/);
+});

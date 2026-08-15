@@ -123,3 +123,51 @@ export function normalisePrefs(prefs = {}) {
   const loopMode = ['off', 'once', 'inf'].includes(prefs.loopMode) ? prefs.loopMode : 'off';
   return { ...prefs, playerSize: size, placement, volume, loopMode };
 }
+
+
+export const UPDATE_CONTRACT = Object.freeze({
+  artifactPrefix: 'youtube-float-desktop-plugin-',
+  artifactSuffix: '.zip',
+  maxBytes: 2_000_000,
+  pluginId: 'youtube-float',
+  releaseOrigin: 'https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin',
+});
+
+export function releaseAssetFor(release, contract = UPDATE_CONTRACT) {
+  const tag = release?.tag_name || '';
+  const expectedName = `${contract.artifactPrefix}${tag}${contract.artifactSuffix}`;
+  return (Array.isArray(release?.assets) ? release.assets : []).find(asset => asset?.name === expectedName) || null;
+}
+
+export function validateRelease(current, release, contract = UPDATE_CONTRACT) {
+  const latest = release?.tag_name || '';
+  const url = release?.html_url || '';
+  if (!latest || !/^v\d+(?:\.\d+){1,3}$/.test(latest)) return { ok: false, state: 'invalid', reason: 'malformed release response' };
+  if (!url.startsWith(contract.releaseOrigin + '/releases/tag/')) return { ok: false, state: 'invalid', reason: 'invalid source' };
+  const cmp = compareVersions(latest, current);
+  if (cmp === 0) return { ok: true, state: 'current', latest, url };
+  if (cmp < 0) return { ok: true, state: 'newer-installed', latest, url };
+  const asset = releaseAssetFor(release, contract);
+  if (!asset) return { ok: false, state: 'invalid', reason: 'missing release artifact', latest, url };
+  if (!String(asset.browser_download_url || '').startsWith(contract.releaseOrigin + '/releases/download/' + latest + '/')) return { ok: false, state: 'invalid', reason: 'invalid source', latest, url };
+  if (!String(asset.name || '').endsWith(contract.artifactSuffix)) return { ok: false, state: 'invalid', reason: 'invalid file type', latest, url };
+  if (!Number.isFinite(asset.size) || asset.size <= 0 || asset.size > contract.maxBytes) return { ok: false, state: 'invalid', reason: 'oversized download', latest, url };
+  return { ok: true, state: 'available', latest, url, asset };
+}
+
+export function validateDownloadedPlugin({ manifest, pluginSource, expectedVersion, contract = UPDATE_CONTRACT }) {
+  if (manifest?.id !== contract.pluginId) return { ok: false, reason: 'wrong plugin ID' };
+  if (manifest?.version !== expectedVersion) return { ok: false, reason: 'wrong downloaded version' };
+  if (typeof pluginSource !== 'string' || pluginSource.length < 1000 || pluginSource.length > contract.maxBytes) return { ok: false, reason: 'invalid plugin content' };
+  if (!pluginSource.includes(`const VERSION = '${expectedVersion}'`) || !pluginSource.includes('export default')) return { ok: false, reason: 'invalid plugin content' };
+  return { ok: true };
+}
+
+export function updaterPlan({ current, release, hasWriteBridge = false, writeOk = true, contract = UPDATE_CONTRACT }) {
+  const validation = validateRelease(current, release, contract);
+  if (!validation.ok) return { action: 'fallback', reason: validation.reason, validation };
+  if (validation.state !== 'available') return { action: 'none', reason: validation.state, validation };
+  if (!hasWriteBridge) return { action: 'fallback', reason: 'manual update required', validation };
+  if (!writeOk) return { action: 'fallback', reason: 'failed write', validation };
+  return { action: 'install', reason: 'validated', validation };
+}
