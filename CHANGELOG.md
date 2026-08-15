@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.90
+- Test spread dashboard controls.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.89
 - Align the guided dashboard top layout.
 - Updates plugin source, installer, README, and version page.
