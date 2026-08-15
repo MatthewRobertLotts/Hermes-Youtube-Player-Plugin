@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.58-clean-fullscreen-fit'
+const VERSION = 'v3.59-preserve-pause-mask'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -512,6 +512,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const rootRef = useRef(null)
   const fullscreenBoxRef = useRef(null)
   const clickTimerRef = useRef(null)
+  const fullscreenPausedRef = useRef(null)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
   const historyRef = useRef(history)
@@ -638,7 +639,8 @@ function YouTubeFloat({ pane = false } = {}) {
   useEffect(() => {
     const webview = playerRef.current
     if (!webview || !videoId || loginPaneRef.current) return undefined
-    const restore = progress.paused ? 'pause' : 'play'
+    const restorePaused = fullscreenPausedRef.current != null ? fullscreenPausedRef.current : progress.paused
+    const restore = restorePaused ? 'pause' : 'play'
     const apply = () => {
       try {
         void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true)
@@ -991,17 +993,24 @@ function YouTubeFloat({ pane = false } = {}) {
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   const toggleFullscreen = () => {
     resumeStartRef.current = progress.current || 0
+    fullscreenPausedRef.current = progress.paused === true
     setFullscreenBusy(true)
-    setLocalFullscreen(v => !v)
+    setLocalFullscreen(v => {
+      const next = !v
+      try { void playerRef.current?.executeJavaScript(fullscreenFitScript(next), true) } catch (e) {}
+      try { void playerRef.current?.executeJavaScript(driveScript(fullscreenPausedRef.current ? 'pause' : 'play'), true) } catch (e) {}
+      return next
+    })
   }
   const clickPlayerOverlay = () => {
     if (!videoId) return
     if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current)
-    clickTimerRef.current = window.setTimeout(() => { clickTimerRef.current = null; void runCommand('playPause') }, 220)
+    clickTimerRef.current = window.setTimeout(() => { clickTimerRef.current = null; void runCommand('playPause') }, 420)
   }
   const doubleClickPlayerOverlay = e => {
     e.preventDefault()
     if (clickTimerRef.current) { window.clearTimeout(clickTimerRef.current); clickTimerRef.current = null }
+    fullscreenPausedRef.current = progress.paused === true
     if (videoId) toggleFullscreen()
   }
   // Static-title select: value pinned to a disabled-capable placeholder option carrying the label,
@@ -1019,8 +1028,8 @@ function YouTubeFloat({ pane = false } = {}) {
     children: [jsx('option', { value: '__title', children: label }, '__title'), ...children]
   })
   const playerBoxStyle = { height: cfg().player }
-  const fullscreenWebviewStyle = { left: 0, top: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', transform: 'none' }
-  const playerWebviewStyle = localFullscreen ? fullscreenWebviewStyle : undefined
+  const fullscreenWebviewStyle = { left: 0, top: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', opacity: fullscreenBusy ? 0 : 1, transform: 'none' }
+  const playerWebviewStyle = localFullscreen ? fullscreenWebviewStyle : (fullscreenBusy ? { opacity: 0 } : undefined)
   const playerWebviewClass = 'absolute inset-0 h-full w-full bg-black'
   const lockedPlayerWebviewClass = 'pointer-events-none absolute inset-0 h-full w-full bg-black'
   const togglePlacement = () => {
@@ -1142,7 +1151,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.58 ★',
+        title: 'YouTube v3.59 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

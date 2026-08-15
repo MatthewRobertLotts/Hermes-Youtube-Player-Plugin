@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.59
+- Polish fullscreen controls.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.58
 - Tune fullscreen transition timing.
 - Updates plugin source, installer, README, and version page.
