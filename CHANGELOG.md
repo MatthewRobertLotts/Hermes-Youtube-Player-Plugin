@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.52
+- Refine fullscreen behavior.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.51
 - Add fullscreen mode iteration.
 - Update plugin source, installer, README, and version page.
