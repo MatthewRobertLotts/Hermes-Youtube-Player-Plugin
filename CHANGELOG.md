@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.81
+- Load Shorts from a dedicated source.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.80
 - Filter Shorts and Playlist shelf data.
 - Updates plugin source, installer, README, and version page.
