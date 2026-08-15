@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.59-preserve-pause-mask'
+const VERSION = 'v3.60-one-shot-pause-restore'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -639,20 +639,18 @@ function YouTubeFloat({ pane = false } = {}) {
   useEffect(() => {
     const webview = playerRef.current
     if (!webview || !videoId || loginPaneRef.current) return undefined
-    const restorePaused = fullscreenPausedRef.current != null ? fullscreenPausedRef.current : progress.paused
-    const restore = restorePaused ? 'pause' : 'play'
-    const apply = () => {
-      try {
-        void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true)
-        void webview.executeJavaScript(driveScript(restore), true)
-      } catch (e) {}
+    const restorePaused = fullscreenPausedRef.current
+    const applyFit = () => { try { void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true) } catch (e) {} }
+    const applyRestoreOnce = () => {
+      if (restorePaused == null) return
+      try { void webview.executeJavaScript(driveScript(restorePaused ? 'pause' : 'play'), true) } catch (e) {}
     }
-    apply()
-    const a = window.setTimeout(apply, 160)
-    const b = window.setTimeout(apply, 520)
+    applyFit()
+    const a = window.setTimeout(applyFit, 160)
+    const b = window.setTimeout(() => { applyFit(); applyRestoreOnce(); fullscreenPausedRef.current = null }, 520)
     const c = window.setTimeout(() => setFullscreenBusy(false), 750)
     return () => { window.clearTimeout(a); window.clearTimeout(b); window.clearTimeout(c) }
-  }, [localFullscreen, videoId, progress.paused])
+  }, [localFullscreen, videoId])
 
   useEffect(() => {
     const webview = playerRef.current
@@ -998,7 +996,6 @@ function YouTubeFloat({ pane = false } = {}) {
     setLocalFullscreen(v => {
       const next = !v
       try { void playerRef.current?.executeJavaScript(fullscreenFitScript(next), true) } catch (e) {}
-      try { void playerRef.current?.executeJavaScript(driveScript(fullscreenPausedRef.current ? 'pause' : 'play'), true) } catch (e) {}
       return next
     })
   }
@@ -1151,7 +1148,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.59 ★',
+        title: 'YouTube v3.60 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
