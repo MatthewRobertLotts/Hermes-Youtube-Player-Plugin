@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.87
+- Compact the media-control top bar.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.86
 - Test the large media-control top bar.
 - Updates plugin source, installer, README, and version page.
