@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.97-scrollable-description'
+const VERSION = 'v3.98-description-links-source'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1252,7 +1252,13 @@ function YouTubeDashboard() {
   const btn = 'rounded-full border bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
   const metric = (label, value) => jsxs('div', { className: 'rounded-xl bg-white/[0.055] px-3 py-2', children: [jsx('div', { className: 'text-lg font-semibold leading-none', children: value }), jsx('div', { className: 'mt-0.5 text-[10px] text-(--ui-text-tertiary)', children: label })] })
   const infoBox = (label, value) => jsxs('div', { className: 'min-w-0 rounded-xl bg-white/[0.055] px-3 py-2', style: { border: '1px solid ' + DASH_BORDER }, children: [jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: label }), jsx('div', { className: 'mt-1 truncate text-sm font-semibold', children: value })] })
-  const linkify = text => String(text || '').split(/(https?:\/\/[^\s]+)/g).filter(Boolean).map((part, i) => /^https?:\/\//.test(part) ? jsx('a', { className: 'text-(--ui-accent) underline underline-offset-2 hover:brightness-125', href: part, onClick: e => e.stopPropagation(), rel: 'noreferrer', target: '_blank', children: part }, i) : part)
+  const linkify = text => String(text || '').split(/(https?:\/\/[^\s<>'"]+|www\.[^\s<>'"]+)/g).filter(Boolean).map((part, i) => {
+    if (!/^(https?:\/\/|www\.)/.test(part)) return part
+    const url = part.replace(/[),.;:]+$/, '')
+    const tail = part.slice(url.length)
+    const href = url.startsWith('www.') ? 'https://' + url : url
+    return jsxs('span', { children: [jsx('a', { className: 'font-semibold underline underline-offset-2 hover:brightness-125', href, onClick: e => { e.preventDefault(); e.stopPropagation(); try { window.open(href, '_blank', 'noopener,noreferrer') } catch (err) {} }, rel: 'noreferrer', style: { color: 'var(--ui-accent)' }, target: '_blank', children: url }, i), tail] }, 'link-' + i)
+  })
   const descriptionBlocks = String(nowDescription || '').split(/\n{2,}|\s*\/\/\s*/).map(x => x.trim()).filter(Boolean)
   const videoCard = item => jsxs('button', { className: 'w-40 shrink-0 text-left', onClick: () => playFromDashboard(item), title: item.title || item.id, type: 'button', children: [
     jsx('img', { alt: '', className: 'aspect-video w-40 rounded-lg bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
@@ -1301,7 +1307,7 @@ function YouTubeDashboard() {
           infoBox('Channel', nowChannel),
           infoBox('Duration', fmt(current?.duration || 0)),
           infoBox('Views', nowViews),
-          infoBox('List', current?.playlist ? 'Playlist' : 'Single')
+          infoBox('Source', current?.playlist ? 'Playlist' : 'Single video')
         ] }),
         jsxs('div', { className: 'grid min-h-0 rounded-xl bg-white/[0.045] px-3 py-2', style: { gridTemplateRows: 'auto minmax(0, 1fr)', border: '1px solid ' + DASH_BORDER }, children: [
           jsx('div', { className: 'text-[10px] uppercase tracking-wide text-(--ui-text-tertiary)', children: 'Description' }),
@@ -1366,7 +1372,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.97 ★',
+        title: 'YouTube v3.98 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
