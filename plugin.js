@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.60-one-shot-pause-restore'
+const VERSION = 'v3.61-paused-only-restore'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -639,16 +639,14 @@ function YouTubeFloat({ pane = false } = {}) {
   useEffect(() => {
     const webview = playerRef.current
     if (!webview || !videoId || loginPaneRef.current) return undefined
-    const restorePaused = fullscreenPausedRef.current
+    const restorePaused = fullscreenPausedRef.current === true
     const applyFit = () => { try { void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true) } catch (e) {} }
-    const applyRestoreOnce = () => {
-      if (restorePaused == null) return
-      try { void webview.executeJavaScript(driveScript(restorePaused ? 'pause' : 'play'), true) } catch (e) {}
-    }
+    const pauseIfNeeded = () => { if (restorePaused) { try { void webview.executeJavaScript(driveScript('pause'), true) } catch (e) {} } }
     applyFit()
-    const a = window.setTimeout(applyFit, 160)
-    const b = window.setTimeout(() => { applyFit(); applyRestoreOnce(); fullscreenPausedRef.current = null }, 520)
-    const c = window.setTimeout(() => setFullscreenBusy(false), 750)
+    pauseIfNeeded()
+    const a = window.setTimeout(() => { applyFit(); pauseIfNeeded() }, 220)
+    const b = window.setTimeout(() => { applyFit(); pauseIfNeeded() }, 650)
+    const c = window.setTimeout(() => { pauseIfNeeded(); fullscreenPausedRef.current = null; setFullscreenBusy(false) }, 1200)
     return () => { window.clearTimeout(a); window.clearTimeout(b); window.clearTimeout(c) }
   }, [localFullscreen, videoId])
 
@@ -1148,7 +1146,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.60 ★',
+        title: 'YouTube v3.61 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

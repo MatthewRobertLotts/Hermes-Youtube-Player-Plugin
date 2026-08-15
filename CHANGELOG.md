@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.61
+- Prepare host fullscreen support.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.60
 - Polish fullscreen mode.
 - Updates plugin source, installer, README, and version page.
