@@ -35,6 +35,7 @@ const required = [
   'TROUBLESHOOTING.md',
   'CONTRIBUTING.md',
   'ARCHITECTURE.md',
+  'PERFORMANCE.md',
 ];
 for (const file of required) if (!exists(file)) fail(`missing ${file}`);
 

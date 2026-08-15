@@ -325,3 +325,20 @@ export function lifecycleStatus({ registered = false, playerOpen = true, placeme
     simultaneousDecoders: decode.length ? new Set(decode).size : 1,
   };
 }
+
+
+export function stableSourceFor(url, cache) {
+  if (!url) return '';
+  const store = cache || new Map();
+  if (store.has(url)) return store.get(url);
+  const ts = Date.now();
+  const value = url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + ts;
+  store.set(url, value);
+  return value;
+}
+
+export function boundedInterval(mode) {
+  // 450ms while actively playing media (end/drift detection needs it); back off when idle so an
+  // open-but-unused player is not hammering executeJavaScript all session.
+  return mode === 'play' ? 450 : 1000;
+}

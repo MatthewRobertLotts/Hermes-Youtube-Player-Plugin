@@ -4,6 +4,7 @@ import {
   adapterState,
   YOUTUBE_COMPAT,
   autoAdvanceQueueItem,
+  boundedInterval,
   captionChoice,
   clampTime,
   compareVersions,
@@ -20,6 +21,7 @@ import {
   queueState,
   previousQueueItem,
   seekBy,
+  stableSourceFor,
   startSecondsFrom,
   UPDATE_CONTRACT,
   updateState,
@@ -200,4 +202,21 @@ test('hardens docked/floating lifecycle bookkeeping', () => {
   assert.equal(lifecycleStatus({ registered: false }).registered, false);
   assert.equal(lifecycleStatus({ placement: 'garbage' }).placement, 'docked');
   assert.equal(lifecycleStatus({ queueItems: [{ id: 'a' }], queueIndex: 4, log: ['x resume'] }).queueRestored, false);
+});
+
+
+test('cache-busted sources are stable across renders and rebust on new key', () => {
+  const cache = new Map();
+  const a = stableSourceFor('https://example.test/feed', cache);
+  assert.equal(stableSourceFor('https://example.test/feed', cache), a);
+  const b = stableSourceFor('https://example.test/other', cache);
+  assert.notEqual(b, a);
+  assert.match(a, /_=\d+/);
+  assert.equal(stableSourceFor('', new Map()), '');
+});
+
+test('bounded timers back off when player is idle', () => {
+  assert.equal(boundedInterval('play'), 450);
+  assert.equal(boundedInterval('off'), 1000);
+  assert.equal(boundedInterval('paused'), 1000);
 });

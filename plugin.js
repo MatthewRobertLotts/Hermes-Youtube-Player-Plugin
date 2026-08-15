@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.127'
+const VERSION = 'v3.128'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -137,6 +137,16 @@ const ACCOUNT_FEEDS = {
   yourplaylists: 'https://www.youtube.com/feed/you'
 }
 function cacheBust(url) { return url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now() }
+// Stable cache-busted source per unique URL: persistent hidden webviews must keep ONE src across
+// re-renders and dock/float swaps, or React reads a changed src and tears down + reloads them,
+// re-fetching YouTube and resetting each hidden session on every transition (a real perf/leak bug).
+const stableSourceCache = new Map()
+const stableSource = url => {
+  if (stableSourceCache.has(url)) return stableSourceCache.get(url)
+  const v = cacheBust(url)
+  stableSourceCache.set(url, v)
+  return v
+}
 function searchSrc(query, filter) {
   const sp = SP_FILTERS[filter]
   if (ACCOUNT_FEEDS[filter]) return cacheBust(ACCOUNT_FEEDS[filter])
@@ -1485,12 +1495,12 @@ function YouTubeDashboard() {
     jsx('div', { className: 'flex gap-3 overflow-x-auto scroll-smooth pb-2 pr-2', children: items.length ? items.map(mapper) : [emptyTile(empty)] })
   ] }, title)
   return jsxs('div', { className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
-    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
-    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: YT_WEBVIEW_PARTITION, ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
-    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
-    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
-    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
-    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: shortsRef, src: searchSrc('shorts', 'shorts') }),
+    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: homeRef, src: stableSource('https://www.youtube.com/') }),
+    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: YT_WEBVIEW_PARTITION, ref: historyFeedRef, src: stableSource(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: subsRef, src: stableSource(ACCOUNT_FEEDS.subscriptions) }) : null,
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: watchLaterRef, src: stableSource(ACCOUNT_FEEDS.watchlater) }) : null,
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: playlistsRef, src: stableSource(ACCOUNT_FEEDS.yourplaylists) }) : null,
+    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: shortsRef, src: stableSource(searchSrc('shorts', 'shorts')) }),
     jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-2xl bg-white/[0.04] p-2', style: { gridTemplateColumns: '580px minmax(0, 1fr)', gap: 12 }, children: [
       jsxs('div', { className: 'grid min-h-0', style: { gridTemplateRows: '290px 104px', gap: 8 }, children: [
         jsx('img', { alt: '', className: 'h-full min-h-0 w-full rounded-xl bg-black object-contain', style: { border: '1px solid ' + DASH_BORDER }, src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
@@ -1585,7 +1595,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.127 ★',
+        title: 'YouTube v3.128 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

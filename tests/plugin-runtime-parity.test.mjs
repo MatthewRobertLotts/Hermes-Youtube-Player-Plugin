@@ -102,6 +102,14 @@ test('plugin.js playback reliability clamps seek and Shorts advance', () => {
 });
 
 
+test('plugin.js keeps persistent webview sources stable across renders', () => {
+  assert.match(plugin, /const stableSourceCache = new Map\(\)/);
+  assert.match(plugin, /const stableSource = url =>/);
+  assert.match(plugin, /ref: homeRef, src: stableSource/);
+  assert.match(plugin, /ref: shortsRef, src: stableSource/);
+});
+
+
 test('plugin.js lifecycle cleanup prevents duplicate players and handlers', () => {
   assert.match(plugin, /if \(disposePlayer\) disposePlayer\(\)/);
   assert.match(plugin, /setActionHandler\(a, null\)/);
