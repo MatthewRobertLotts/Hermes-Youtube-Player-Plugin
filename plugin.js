@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.85-signed-history-filter'
+const VERSION = 'v3.86-media-control-top'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1224,7 +1224,7 @@ function YouTubeDashboard() {
   const open = placement => { if (setPlayerPlacement) setPlayerPlacement(placement); else if (setPlayerOpen) setPlayerOpen(true) }
   const playFromDashboard = item => { open(state.placement || 'docked'); if (dashboardPlayItem) dashboardPlayItem(item); else pendingDashboardPlayItem = item }
   const manageAccount = () => { accountPaneRequested = true; if (playerOpenState && playerPlacementState === 'docked' && openAccountPane) openAccountPane(); else open('docked') }
-  const command = action => { if (dashboardPlayerCommand) void dashboardPlayerCommand(action); else open('docked') }
+  const command = (action, value) => { if (dashboardPlayerCommand) void dashboardPlayerCommand(action, value); else open('docked') }
   const localRecent = Array.isArray(history) ? history.slice(0, 18) : []
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
@@ -1257,23 +1257,25 @@ function YouTubeDashboard() {
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: shortsRef, src: searchSrc('shorts', 'shorts') }),
-    jsxs('div', { className: 'grid gap-3 rounded-2xl bg-white/[0.04] p-3 lg:grid-cols-[minmax(520px,1fr)_520px]', children: [
-      jsxs('div', { className: 'flex min-w-0 gap-4', children: [
-        jsx('img', { alt: '', className: 'aspect-video w-52 shrink-0 rounded-xl bg-black object-cover', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
-        jsxs('div', { className: 'min-w-0 self-center', children: [
-          jsx('div', { className: 'text-[10px] font-semibold uppercase tracking-wide text-(--ui-accent)', children: 'Now playing' }),
-          jsx('div', { className: 'line-clamp-2 text-base font-semibold leading-snug', children: nowTitle }),
-          jsx('div', { className: 'mt-1 text-xs text-(--ui-text-tertiary)', children: current?.videoId ? fmt(current.current || 0) + ' / ' + fmt(current.duration || 0) + (current.paused ? ' · paused' : ' · playing') : 'No active video yet' }),
-          jsxs('div', { className: 'mt-2 flex flex-wrap gap-2', children: [
-            jsx('button', { className: btn, disabled: !current?.videoId, onClick: () => command('rewind'), type: 'button', children: '-10s' }),
-            jsx('button', { className: btn, disabled: !current?.videoId, onClick: () => command('playPause'), type: 'button', children: current?.paused ? 'Play' : 'Pause' }),
-            jsx('button', { className: btn, disabled: !current?.videoId, onClick: () => command('forward'), type: 'button', children: '+10s' }),
-            jsx('button', { className: btn, disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show' }),
-            jsx('button', { className: btn, onClick: manageAccount, type: 'button', children: state.accountOpen ? 'Close account' : (account.signedIn ? 'Account' : 'Sign in') })
-          ] })
+    jsxs('div', { className: 'grid gap-3 rounded-[1.75rem] border border-white/10 bg-gradient-to-r from-white/[0.09] via-white/[0.045] to-white/[0.025] p-3 shadow-2xl lg:grid-cols-[220px_1fr_420px]', children: [
+      jsx('img', { alt: '', className: 'aspect-video w-full rounded-2xl bg-black object-cover shadow-lg ring-1 ring-white/10', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
+      jsxs('div', { className: 'min-w-0 self-center rounded-2xl bg-black/20 p-3 ring-1 ring-white/5', children: [
+        jsx('div', { className: 'text-[10px] font-semibold uppercase tracking-[0.22em] text-(--ui-accent)', children: 'Now playing' }),
+        jsx('div', { className: 'mt-1 line-clamp-1 text-base font-semibold leading-snug', children: nowTitle }),
+        jsxs('div', { className: 'mt-3 flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
+          jsx('span', { className: 'w-10 shrink-0 tabular-nums', children: fmt(current?.current || 0) }),
+          jsx('input', { className: 'h-2 min-w-0 flex-1 accent-(--ui-accent)', disabled: !current?.videoId, max: current?.duration || 0, min: 0, onChange: e => command('seek', Number(e.currentTarget.value)), onPointerUp: e => e.currentTarget.blur(), type: 'range', value: Math.min(current?.current || 0, current?.duration || current?.current || 0) }),
+          jsx('span', { className: 'w-10 shrink-0 text-right tabular-nums', children: fmt(current?.duration || 0) })
+        ] }),
+        jsxs('div', { className: 'mt-3 flex items-center justify-center gap-2', children: [
+          jsx('button', { className: btn, disabled: !current?.videoId, onClick: () => command('rewind'), type: 'button', children: '-10s' }),
+          jsx('button', { className: 'grid h-9 min-w-20 place-items-center rounded-full bg-(--ui-accent) px-5 text-sm font-semibold text-(--ui-accent-contrast) shadow-lg shadow-black/30 hover:brightness-110 disabled:opacity-50', disabled: !current?.videoId, onClick: () => command('playPause'), type: 'button', children: current?.paused ? 'Play' : 'Pause' }),
+          jsx('button', { className: btn, disabled: !current?.videoId, onClick: () => command('forward'), type: 'button', children: '+10s' }),
+          jsx('button', { className: btn, disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show' }),
+          jsx('button', { className: btn, onClick: manageAccount, type: 'button', children: state.accountOpen ? 'Close account' : (account.signedIn ? 'Account' : 'Sign in') })
         ] })
       ] }),
-      jsxs('div', { className: 'grid grid-cols-4 gap-2 self-center', children: [
+      jsxs('div', { className: 'grid grid-cols-2 gap-2 self-stretch', children: [
         metric('Recommended', recommended.length),
         metric('History', recent.length),
         metric('Playlists', playlists.length),
@@ -1331,7 +1333,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.85 ★',
+        title: 'YouTube v3.86 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
