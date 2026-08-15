@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.107.2
+- Update README description, feature list, known bugs, and roadmap to reflect the current dashboard/player work.
+- Preserve the existing landing-page format and screenshot layout.
+
 ## v3.107.1
 - Restore the polished README landing-page layout and screenshot sections.
 - Keep v3.107 current-version metadata.

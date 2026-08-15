@@ -1,7 +1,7 @@
 <h1 align="center">Hermes YouTube Player Plugin</h1>
 
 <p align="center">
-  The definitive native YouTube player for <strong>Hermes Desktop</strong>: dock it, float it, search YouTube, play signed-in feeds, chain playlists, resume across layout switches, and control playback without leaving your workspace.
+  The definitive native YouTube player and dashboard for <strong>Hermes Desktop</strong>: dock it, float it, open <code>/youtube</code>, browse signed-in shelves, play real YouTube watch pages, and control playback without leaving your workspace.
 </p>
 
 <p align="center">
@@ -31,9 +31,9 @@
 
 This is not a toy embed and it is not a browser tab with a YouTube page thrown into it.
 
-It is a native Hermes Desktop media player that uses YouTube's real watch-page player where that matters, then wraps it in Hermes-native controls, panes, status chips, persistence, search, account feeds, and dock/floating lifecycle management.
+It is a native Hermes Desktop media player and account-aware YouTube dashboard. Playback stays on YouTube's real watch-page player, while Hermes owns the controls, dock/floating panes, `/youtube` route, dashboard shelves, status chip, safe persistence, and close/reopen lifecycle.
 
-If you want YouTube inside Hermes without losing your workspace, fighting browser chrome, or rebuilding a player from broken scraped streams, this is the one.
+If you want YouTube inside Hermes without losing your workspace, exposing browser chrome, or rebuilding playback from broken scraped streams, this is the one.
 
 ---
 
@@ -44,11 +44,11 @@ YouTube inside an Electron desktop plugin is easy until you try to make it good.
 - Normal embeds fail or throw player configuration errors.
 - Scraped direct streams can play audio with black video.
 - YouTube's page chrome fights your UI.
-- Search results, Shorts, playlists, signed-in feeds, captions, and quality controls all come from different YouTube surfaces.
+- Search results, Shorts, playlists, signed-in feeds, History, captions, and quality controls all come from different YouTube surfaces.
 - Hermes panes have their own lifecycle: docked, floating, closed, reopened, moved, remounted.
 - A media player must survive all of that without hijacking chat typing, duplicating panes, losing state, or randomly autoplaying on app reopen.
 
-This plugin does the boring hard work: real YouTube playback, native Hermes controls, safe persistence, signed-in account support, fast pin/unpin resume, and single-active-pane behavior.
+This plugin does the boring hard work: real YouTube playback, native Hermes controls, safe persistence, signed-in account support, `/youtube` dashboard shelves, fast pin/unpin resume, and single-active-pane behavior.
 
 ---
 
@@ -61,6 +61,7 @@ This plugin does the boring hard work: real YouTube playback, native Hermes cont
 - One-click pin/unpin beside the timeline.
 - Single active player instance: no duplicate docked/floating copies.
 - `/youtube` route and sidebar entry.
+- Native `/youtube` dashboard with account-aware shelves.
 - Command palette opener.
 - Status-bar chip with open/closed and docked/floating state.
 - Safe close/reopen behavior from docked tab, floating header, and status chip.
@@ -68,12 +69,13 @@ This plugin does the boring hard work: real YouTube playback, native Hermes cont
 ### Real YouTube playback
 
 - Uses YouTube's own watch-page player in a persistent webview partition.
-- Plugin-owned transport controls: Prev, Next, -10s, +10s, Play/Pause.
+- Plugin-owned transport controls: Show, Prev, Next, -10s, +10s, Play/Pause.
 - Dominant scrub timeline with live time/duration.
 - Volume popover.
 - Quality dropdown powered by YouTube's available quality levels.
 - Subtitle/caption control using YouTube's caption tracks.
 - Loop modes: off, once, infinite.
+- Plugin-only Big Screen mode using the real watch page.
 - OS media controls via Media Session.
 - No global keyboard shortcuts that steal Space/J/K/L/arrow keys from Hermes chat.
 
@@ -87,6 +89,8 @@ This plugin does the boring hard work: real YouTube playback, native Hermes cont
 - Signed-in account mode.
 - Signed-in feeds: History, Subscriptions, Watch Later, Your Playlists.
 - `/youtube` dashboard shelves: Recommended, History, Subscriptions, Watch Later, Shorts, Playlists.
+- Recommended loads from YouTube Home, not a stale search term.
+- Dashboard cards open directly in the player.
 - Account webview stays locked down outside explicit account/login mode.
 - History loads through YouTube signed-in browse data for the selected account/channel.
 
@@ -101,6 +105,9 @@ This plugin does the boring hard work: real YouTube playback, native Hermes cont
 
 - Mini / Small / Medium / Large size modes.
 - Pin button left of the timeline, volume right of the timeline.
+- Compact dashboard media-control bar with contained thumbnail and Show-first controls.
+- Dashboard stats panel: channel, duration, views, source, row counts, and scrollable description.
+- Highlighted/clickable description links.
 - Docked and floating close controls use Hermes chrome where possible.
 - Status chip tells you whether the player is open, closed, docked, or floating.
 - Raw YouTube account/feed panes are covered while scraping so the plugin stays a media player, not a random browser window.
@@ -151,16 +158,30 @@ The installer writes to both `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERP
 
 ---
 
+## Known bugs / limitations
+
+- True taskbar-covering fullscreen needs Hermes Desktop host support; current Big Screen stays plugin-owned and keeps the Windows taskbar visible.
+- YouTube signed-in feeds can take a few seconds to hydrate before shelves populate.
+- History depends on YouTube's signed-in web session and internal browse data; if YouTube changes that surface, the shelf may need another scraper/API adjustment.
+- Account/login mode is intentionally temporary: normal playback stays locked down, not browsable.
+
+---
+
 ## Roadmap
 
-Before the dashboard:
+Shipped recently:
 
-- Better responsive scaling for very wide docked panes. *(shipped v3.41)*
-- Persist the signed-in account label across player remounts so the Account button reflects the real logged-in session immediately. *(shipped v3.41)*
+- Docked/floating placement, fast pin/unpin resume, close/reopen lifecycle, and account-label persistence.
+- Native `/youtube` dashboard with locked shelves: Recommended, History, Subscriptions, Watch Later, Shorts, Playlists.
+- Dashboard top media bar with contained thumbnail, Show-first controls, stats, scrollable description, and clickable links.
+- History source fixed to follow the selected signed-in YouTube account/channel.
 
-Next major feature:
+Coming soon:
 
-- Replace the current `/youtube` route with a proper native YouTube dashboard: account-aware sections, feed shortcuts, recent queues, and player actions — not just a giant duplicate player.
+- Proper host-owned fullscreen once Hermes Desktop exposes a safe native fullscreen API.
+- Better dashboard visuals/screenshots for the new `/youtube` surface.
+- Smarter "ask about what's playing" integration from the current title/channel/timestamp.
+- More resilient feed diagnostics if YouTube changes signed-in shelf markup again.
 
 ---
 
