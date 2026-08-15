@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.75
+- Add live dashboard controls and row stats.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.74
 - Separate dashboard shelf data stores.
 - Updates plugin source, installer, README, and version page.
