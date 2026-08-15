@@ -1,4 +1,11 @@
-const PLAYLIST_ID_RE = /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/;
+export const YOUTUBE_COMPAT = Object.freeze({
+  historyBrowseId: 'FEhistory',
+  playlistIdPattern: '^(PL|RD|OLAK5uy|UU|FL|LL|WL)',
+  trustedHosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'],
+  webviewPartition: 'persist:hermes-youtube-float-player',
+});
+
+const PLAYLIST_ID_RE = new RegExp(YOUTUBE_COMPAT.playlistIdPattern);
 const VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
 
 export function videoIdFrom(input) {

@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.111'
+const VERSION = 'v3.112'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -17,6 +17,12 @@ const SEARCH_HISTORY_KEY = 'hermes-yt-search-history'
 const PREF_KEY = 'hermes-yt-prefs'
 const HISTORY_MAX = 50
 const SWITCH_RESUME_MS = 120000
+// YouTube compatibility layer — plugin-context constants. Webview-injected scripts below
+// repeat tiny regexes locally because those functions are serialized and run inside youtube.com.
+const YT_VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/
+const YT_PLAYLIST_ID_RE = /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/
+const YT_WEBVIEW_PARTITION = 'persist:hermes-youtube-float-player'
+const YT_HISTORY_BROWSE_ID = 'FEhistory'
 let pluginStorage = null
 let setPlayerPlacement = null
 let setPlayerOpen = null
@@ -86,7 +92,7 @@ function Timeline({ current, duration, onSeek, videoId }) {
 
 function videoIdFrom(input) {
   const text = input.trim()
-  if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text
+  if (YT_VIDEO_ID_RE.test(text)) return text
   try {
     const url = new URL(text)
     if (url.hostname.includes('youtu.be')) return url.pathname.split('/').filter(Boolean)[0] || null
@@ -98,7 +104,7 @@ function videoIdFrom(input) {
 function watchUrl(videoId, playlistId, startAt = 0) {
   if (!videoId) return 'about:blank'
   const start = Math.max(0, Math.floor(Number(startAt) || 0))
-  if (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(videoId)) return 'https://www.youtube.com/playlist?list=' + encodeURIComponent(videoId) + '&autoplay=1' + (start > 1 ? '&t=' + start + 's' : '')
+  if (YT_PLAYLIST_ID_RE.test(videoId)) return 'https://www.youtube.com/playlist?list=' + encodeURIComponent(videoId) + '&autoplay=1' + (start > 1 ? '&t=' + start + 's' : '')
   const base = 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId) + '&autoplay=1' + (start > 1 ? '&t=' + start + 's' : '')
   return playlistId ? base + '&list=' + encodeURIComponent(playlistId) : base
 }
@@ -117,6 +123,7 @@ function searchSrc(query, filter) {
   if (ACCOUNT_FEEDS[filter]) return cacheBust(ACCOUNT_FEEDS[filter])
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + (sp ? '&sp=' + sp : '')
 }
+// Account adapter: detect signed-in YouTube account state without reading cookies.
 const probeLoginScript = '(' + function () {
   // The signed-in state shows an avatar button (#avatar-btn) in the masthead; signed-out shows
   // a "Sign in" button instead. Check the persistent player/session webview.
@@ -125,6 +132,7 @@ const probeLoginScript = '(' + function () {
   return { signedIn: !!avatar || !signIn, name: (avatar && (avatar.getAttribute('aria-label') || '')) || '' }
 }.toString() + ')()'
 
+// Search + Dashboard adapter: parse public page state / ytInitialData / rendered rows.
 const scrapeSearchScript = '(' + function () {
   const out = []
   const seen = new Set()
@@ -244,6 +252,7 @@ const scrapeSearchScript = '(' + function () {
   return { items: out, renderers: keyCount, page: { title: document.title || '', url: location.href || '', hasData: !!window.ytInitialData, bodyLen: (document.body ? document.body.innerHTML.length : 0), ytLen: window.ytInitialData ? JSON.stringify(window.ytInitialData).length : 0 } }
 }.toString() + ')()'
 
+// History adapter: use youtubei browse data from the selected signed-in YouTube session.
 const historyApiScript = '(' + (async function () {
   const out = []
   const seen = new Set()
@@ -279,7 +288,7 @@ const historyApiScript = '(' + (async function () {
         credentials: 'include',
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ context, browseId: 'FEhistory' })
+        body: JSON.stringify({ context, browseId: YT_HISTORY_BROWSE_ID })
       })
       const data = await r.json()
       walk(data)
@@ -292,6 +301,7 @@ const historyApiScript = '(' + (async function () {
 }).toString() + ')()'
 
 
+// Player adapter: lock the watch-page surface down to media playback only.
 const stripScript = '(' + function () {
   const css = `
     html,body,ytd-app,#content,#page-manager,ytd-watch-flexy{background:#000!important;margin:0!important;padding:0!important;overflow:hidden!important}
@@ -352,6 +362,7 @@ function fullscreenFitScript(active) {
   }.toString() + ')(' + JSON.stringify({ active: !!active }) + ')'
 }
 
+// Player adapter: Hermes controls -> YouTube player/video APIs.
 function driveScript(action, value) {
   return '(' + function (payload) {
     const p = document.getElementById('movie_player')
@@ -431,6 +442,7 @@ function driveScript(action, value) {
   }.toString() + ')(' + JSON.stringify({ action, value }) + ')'
 }
 
+// Player adapter: read quality/caption capabilities from the watch page.
 const readPlayerScript = '(' + function () {
   const p = document.getElementById('movie_player')
   const v = document.querySelector('video')
@@ -525,6 +537,7 @@ const stateScript = '(' + function () {
   return { ok: true, current, duration, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid, title, channel, description, views, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
 }.toString() + ')()'
 
+// Playlist adapter: parse the active playlist panel without mixing recommendations.
 const playlistFillScript = '(' + function () {
   const out = []
   const seen = new Set()
@@ -1206,27 +1219,27 @@ function YouTubeFloat({ pane = false } = {}) {
       style: bigScreenActive ? undefined : playerBoxStyle,
       children: playlistsPane
         ? jsxs('div', { className: 'absolute inset-0', children: [
-            jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playlistsPaneRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists), style: playerWebviewStyle }),
+            jsx('webview', { className: playerWebviewClass, partition: YT_WEBVIEW_PARTITION, ref: playlistsPaneRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists), style: playerWebviewStyle }),
             jsx('div', { className: 'pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black px-3 text-center text-xs text-white/70', children: 'Loading your playlists…' })
           ] })
         : (historyPane
             ? jsxs('div', { className: 'absolute inset-0', children: [
-            jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: historyPaneRef, src: cacheBust(ACCOUNT_FEEDS.history), style: playerWebviewStyle }),
+            jsx('webview', { className: playerWebviewClass, partition: YT_WEBVIEW_PARTITION, ref: historyPaneRef, src: cacheBust(ACCOUNT_FEEDS.history), style: playerWebviewStyle }),
             // Keep the webview rendered (YouTube serves real data to a "visible" webview) but
             // cover it with an opaque loader so the raw browser flash never shows while loading.
             jsx('div', { className: 'pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black px-3 text-center text-xs text-white/70', children: 'Loading your YouTube history…' })
           ] })
         : (loginPane
-        ? jsx('webview', { className: playerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: 'https://www.youtube.com', style: playerWebviewStyle })
+        ? jsx('webview', { className: playerWebviewClass, partition: YT_WEBVIEW_PARTITION, ref: playerRef, src: 'https://www.youtube.com', style: playerWebviewStyle })
         : (videoId
           ? jsxs('div', { className: 'absolute inset-0', children: [
-              jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: 'persist:hermes-youtube-float-player', ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
+              jsx('webview', { key: videoId + (loginPane ? 'L' : ''), className: lockedPlayerWebviewClass, partition: YT_WEBVIEW_PARTITION, ref: playerRef, src: watchUrl(videoId, playlist, resumeStart), style: playerWebviewStyle }),
               jsx('button', { 'aria-label': 'Player click zone: click to play or pause, double-click for fullscreen', className: 'absolute inset-0 z-10 cursor-pointer bg-transparent', onClick: clickPlayerOverlay, onDoubleClick: doubleClickPlayerOverlay, title: 'Click: play/pause. Double-click: fullscreen. Esc exits fullscreen.', type: 'button' }),
               fullscreenBusy ? jsx('div', { className: 'pointer-events-none absolute inset-0 z-20 bg-black/85 transition-opacity duration-150' }) : null
             ] })
           : jsx('div', { className: 'absolute inset-0 grid place-items-center px-3 text-center text-xs text-white/60', children: `${VERSION}: Search, then pick a result below.` }))))
     }),
-    searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: searchRef, src: searchUrl }) : null,
+    searchUrl ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: searchRef, src: searchUrl }) : null,
     jsxs('div', { className: 'shrink-0 border-t border-white/10 bg-(--ui-bg-elevated)/95 px-3 py-2', children: [
       jsxs('div', { className: 'mb-1 flex items-center gap-2', children: [
         mini ? jsx(StaticSelect, { current: playerSize, label: 'Size', onChange: e => setPlayerSize(e.currentTarget.value), title: 'Window size', children: Object.entries(PLAYER_SIZES).map(([value, c]) => jsx('option', { value, children: c.label }, value)) }) : null,
@@ -1371,12 +1384,12 @@ function YouTubeDashboard() {
     jsx('div', { className: 'flex gap-3 overflow-x-auto scroll-smooth pb-2 pr-2', children: items.length ? items.map(mapper) : [emptyTile(empty)] })
   ] }, title)
   return jsxs('div', { className: 'relative grid h-full min-h-0 overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', style: { gridTemplateRows: '420px minmax(0, 1fr)' }, children: [
-    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
-    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
-    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
-    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
-    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
-    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: shortsRef, src: searchSrc('shorts', 'shorts') }),
+    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
+    jsx('webview', { className: 'pointer-events-none absolute opacity-0', partition: YT_WEBVIEW_PARTITION, ref: historyFeedRef, src: cacheBust(ACCOUNT_FEEDS.history), style: { height: 720, left: -1600, top: 0, width: 1280 } }),
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
+    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: YT_WEBVIEW_PARTITION, ref: shortsRef, src: searchSrc('shorts', 'shorts') }),
     jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-2xl bg-white/[0.04] p-2', style: { gridTemplateColumns: '580px minmax(0, 1fr)', gap: 12 }, children: [
       jsxs('div', { className: 'grid min-h-0', style: { gridTemplateRows: '290px 104px', gap: 8 }, children: [
         jsx('img', { alt: '', className: 'h-full min-h-0 w-full rounded-xl bg-black object-contain', style: { border: '1px solid ' + DASH_BORDER }, src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
@@ -1471,7 +1484,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.111 ★',
+        title: 'YouTube v3.112 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isShortUrl, nextQueueItem, normaliseDashboardRow, playlistIdFrom, startSecondsFrom, videoIdFrom, watchUrl } from '../src/youtube-core.mjs';
+import { YOUTUBE_COMPAT, isShortUrl, nextQueueItem, normaliseDashboardRow, playlistIdFrom, startSecondsFrom, videoIdFrom, watchUrl } from '../src/youtube-core.mjs';
 
 const id = 'dQw4w9WgXcQ';
 
@@ -53,4 +53,12 @@ test('advances queues like the plugin runtime', () => {
   const playlist = [{ id: 'a', type: 'video' }, { id: 'b', type: 'video' }];
   assert.deepEqual(nextQueueItem({ list: playlist, index: 0, queueMode: 'playlist', playlistId: 'PLx' }), { next: playlist[1], playlist: 'PLx', index: 1 });
   assert.deepEqual(nextQueueItem({ list: playlist, index: 1, queueMode: 'playlist', playlistId: 'PLx' }), { next: null, playlist: null, index: -1 });
+});
+
+
+test('compatibility constants document YouTube boundaries', () => {
+  assert.equal(YOUTUBE_COMPAT.historyBrowseId, 'FEhistory');
+  assert.equal(YOUTUBE_COMPAT.webviewPartition, 'persist:hermes-youtube-float-player');
+  assert.equal(new RegExp(YOUTUBE_COMPAT.playlistIdPattern).test('PLabc123'), true);
+  assert.equal(YOUTUBE_COMPAT.trustedHosts.includes('youtu.be'), true);
 });
