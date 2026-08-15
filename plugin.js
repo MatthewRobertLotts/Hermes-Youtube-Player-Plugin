@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.77-dashboard-autoload'
+const VERSION = 'v3.78-background-dashboard-load'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -32,7 +32,7 @@ let liveDashboardResults = []
 let liveDashboardRows = { history: [], playlists: [], shorts: [], subscriptions: [], videos: [], watchlater: [] }
 let dashboardLoadFeed = null
 let dashboardPlayerCommand = null
-let dashboardAutoLoadStarted = false
+let dashboardBackgroundLoadStarted = false
 const statusListeners = new Set()
 const emitPlayerStatus = () => statusListeners.forEach(fn => { try { fn({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }) } catch (e) {} })
 const readPrefs = () => { try { return pluginStorage ? pluginStorage.get('prefs', {}) : (JSON.parse(localStorage.getItem(PREF_KEY)) || {}) } catch (e) { return {} } }
@@ -1161,32 +1161,53 @@ function YouTubeDashboard() {
   const searches = readList(SEARCH_HISTORY_KEY, 'searchHistory')
   const account = liveAccountState || prefs.account || {}
   const current = livePlayerState || null
+  const homeRef = useRef(null)
+  const historyRef = useRef(null)
+  const subsRef = useRef(null)
+  const watchLaterRef = useRef(null)
   const [state, setState] = useState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState })
   useEffect(() => { statusListeners.add(setState); setState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
   useEffect(() => {
-    if (dashboardAutoLoadStarted || !dashboardLoadFeed) return undefined
-    dashboardAutoLoadStarted = true
-    const jobs = []
-    if (!(liveDashboardRows.recommended || []).length) jobs.push('recommended')
-    if (!(liveDashboardRows.history || []).length) jobs.push('history')
-    if (account.signedIn && !(liveDashboardRows.subscriptions || []).length) jobs.push('subscriptions')
-    if (account.signedIn && !(liveDashboardRows.watchlater || []).length) jobs.push('watchlater')
-    jobs.forEach((key, index) => window.setTimeout(() => { try { dashboardLoadFeed(key) } catch (e) {} }, index * 4200))
-    return undefined
+    if (dashboardBackgroundLoadStarted) return undefined
+    dashboardBackgroundLoadStarted = true
+    const jobs = [
+      ['recommended', homeRef],
+      ['history', historyRef],
+      account.signedIn ? ['subscriptions', subsRef] : null,
+      account.signedIn ? ['watchlater', watchLaterRef] : null
+    ].filter(Boolean)
+    let cancelled = false
+    jobs.forEach(([key, ref], jobIndex) => {
+      const tick = attempt => window.setTimeout(async () => {
+        if (cancelled || (liveDashboardRows[key] || []).length) return
+        try {
+          const res = await ref.current?.executeJavaScript(scrapeSearchScript, true)
+          const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title)
+          if (clean.length) {
+            liveDashboardRows[key] = clean
+            emitPlayerStatus()
+            return
+          }
+        } catch (e) {}
+        if (attempt < 10) tick(attempt + 1)
+      }, 1800 + jobIndex * 900 + attempt * 1200)
+      tick(0)
+    })
+    return () => { cancelled = true }
   }, [])
   const open = placement => { if (setPlayerPlacement) setPlayerPlacement(placement); else if (setPlayerOpen) setPlayerOpen(true) }
   const manageAccount = () => { accountPaneRequested = true; if (playerOpenState && playerPlacementState === 'docked' && openAccountPane) openAccountPane(); else open('docked') }
-  const loadRow = key => { open('docked'); if (dashboardLoadFeed) window.setTimeout(() => dashboardLoadFeed(key), 60) }
   const command = action => { if (dashboardPlayerCommand) void dashboardPlayerCommand(action); else open('docked') }
-  const recent = Array.isArray(history) ? history.slice(0, 18) : []
+  const localRecent = Array.isArray(history) ? history.slice(0, 18) : []
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
   const recommended = (rows.recommended || []).filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
+  const recent = ((rows.history || []).length ? rows.history : localRecent).slice(0, 18)
   const subscriptions = (rows.subscriptions || []).slice(0, 18)
   const watchlater = (rows.watchlater || []).slice(0, 18)
-  const shorts = (rows.shorts || []).concat(recent.filter(x => x.type === 'short')).slice(0, 18)
+  const shorts = (rows.shorts || []).concat(recommended.filter(x => x.type === 'short'), recent.filter(x => x.type === 'short')).slice(0, 18)
   const playlists = (rows.playlists || []).slice(0, 18)
-  const nowTitle = current?.title || recent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
+  const nowTitle = current?.title || localRecent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
   const btn = 'rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
   const metric = (label, value) => jsxs('div', { className: 'rounded-xl bg-white/[0.055] px-3 py-2', children: [jsx('div', { className: 'text-lg font-semibold leading-none', children: value }), jsx('div', { className: 'mt-0.5 text-[10px] text-(--ui-text-tertiary)', children: label })] })
   const videoCard = item => jsxs('button', { className: 'w-40 shrink-0 text-left', onClick: () => open(state.placement || 'docked'), title: item.title || item.id, type: 'button', children: [
@@ -1194,13 +1215,17 @@ function YouTubeDashboard() {
     jsx('div', { className: 'mt-1 line-clamp-2 text-xs font-medium leading-snug', children: item.title || item.id }),
     jsx('div', { className: 'mt-0.5 truncate text-[10px] text-(--ui-text-tertiary)', children: item.duration || (item.type === 'playlist' ? 'Playlist' : 'Video') })
   ] }, item.id || item.title)
-  const emptyTile = (label, action) => jsx('button', { className: 'grid h-[116px] w-40 shrink-0 place-items-center rounded-lg border border-dashed border-white/15 bg-white/[0.035] px-3 text-center text-xs text-(--ui-text-tertiary) hover:border-(--ui-accent)', onClick: action || (() => open('docked')), type: 'button', children: label })
+  const emptyTile = label => jsx('div', { className: 'grid h-[116px] w-40 shrink-0 place-items-center rounded-lg border border-dashed border-white/15 bg-white/[0.035] px-3 text-center text-xs text-(--ui-text-tertiary)', children: label })
   const searchCard = item => jsx('button', { className: 'w-40 shrink-0 rounded-lg bg-white/[0.06] px-3 py-2 text-left text-xs text-(--ui-text-secondary) hover:bg-white/[0.1]', onClick: () => open('docked'), title: item.term, type: 'button', children: item.term }, item.term)
-  const shelf = (title, items, empty, mapper = videoCard, action) => jsxs('section', { className: 'min-h-0', children: [
+  const shelf = (title, items, empty, mapper = videoCard) => jsxs('section', { className: 'min-h-0', children: [
     jsx('h2', { className: 'mb-2 text-sm font-semibold', children: title }),
-    jsx('div', { className: 'flex gap-3 overflow-x-auto scroll-smooth pb-2 pr-2', children: items.length ? items.map(mapper) : [emptyTile(empty, action)] })
+    jsx('div', { className: 'flex gap-3 overflow-x-auto scroll-smooth pb-2 pr-2', children: items.length ? items.map(mapper) : [emptyTile(empty)] })
   ] }, title)
   return jsxs('div', { className: 'grid h-full min-h-0 grid-rows-[132px_1fr] overflow-hidden bg-[#0f0f0f] p-4 text-(--ui-text-primary)', children: [
+    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: homeRef, src: cacheBust('https://www.youtube.com/') }),
+    jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyRef, src: cacheBust(ACCOUNT_FEEDS.history) }),
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
     jsxs('div', { className: 'grid gap-3 rounded-2xl bg-white/[0.04] p-3 lg:grid-cols-[minmax(520px,1fr)_520px]', children: [
       jsxs('div', { className: 'flex min-w-0 gap-4', children: [
         jsx('img', { alt: '', className: 'aspect-video w-52 shrink-0 rounded-xl bg-black object-cover', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
@@ -1225,12 +1250,12 @@ function YouTubeDashboard() {
       ] })
     ] }),
     jsxs('main', { className: 'min-h-0 overflow-y-auto pt-4', children: [
-      shelf('Recommended videos', recommended, account.signedIn ? 'Load Home recommendations' : 'Load YouTube Home recommendations', videoCard, () => loadRow('recommended')),
-      shelf('History', recent, 'Your played videos appear here', videoCard, () => loadRow('history')),
-      shelf('Subscriptions', subscriptions, account.signedIn ? 'Load subscriptions' : 'Sign in to load subscriptions', videoCard, () => loadRow('subscriptions')),
-      shelf('Watch Later', watchlater, account.signedIn ? 'Load Watch Later' : 'Sign in to use Watch Later', videoCard, () => loadRow('watchlater')),
-      shelf('Shorts', shorts, 'Run a Shorts search to fill this row'),
-      shelf('Playlists', playlists, 'Run a playlist search to fill this row'),
+      shelf('Recommended videos', recommended, 'Loading Home recommendations…'),
+      shelf('History', recent, 'Loading history…'),
+      shelf('Subscriptions', subscriptions, account.signedIn ? 'Loading subscriptions…' : 'Sign in to load subscriptions'),
+      shelf('Watch Later', watchlater, account.signedIn ? 'Loading Watch Later…' : 'Sign in to use Watch Later'),
+      shelf('Shorts', shorts, 'Shorts appear when Home or search provides them'),
+      shelf('Playlists', playlists, 'Playlist search results appear here'),
       shelf('Search history', searchList, 'Search terms appear here', searchCard)
     ] })
   ] })
@@ -1275,7 +1300,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.77 ★',
+        title: 'YouTube v3.78 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

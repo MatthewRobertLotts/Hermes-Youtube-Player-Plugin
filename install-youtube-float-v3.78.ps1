@@ -17,9 +17,9 @@ $targets | Select-Object -Unique | ForEach-Object {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   Copy-Item -Force -Path $source -Destination $_
   $text = Get-Content -Raw -Path $_
-  if ($text -notmatch 'v3.77-dashboard-autoload') { throw "Copy verification failed: $_" }
+  if ($text -notmatch 'v3.78-background-dashboard-load') { throw "Copy verification failed: $_" }
   $written += $_
 }
-Write-Host 'Installed YouTube Float v3.77 to:'
+Write-Host 'Installed YouTube Float v3.78 to:'
 $written | ForEach-Object { Write-Host " - $_" }
-Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.77 ★.'
+Write-Host 'Fully quit Hermes Desktop and reopen it. Pane title should be YouTube v3.78 ★.'
