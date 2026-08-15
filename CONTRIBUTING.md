@@ -13,15 +13,15 @@ Build or download the release zip, then install it into Hermes Desktop:
 ```bash
 python3 scripts/build-release-zip.py --output /tmp/youtube-float.zip --check
 unzip -o /tmp/youtube-float.zip -d /tmp/youtube-float
-sh /tmp/youtube-float/install-youtube-float-v3.126.sh
+sh /tmp/youtube-float/install-youtube-float-v3.127.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-Expand-Archive -Force .\youtube-float-desktop-plugin-v3.126.zip $env:TEMP\youtube-float-v3.126
-cd $env:TEMP\youtube-float-v3.126
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.126.ps1
+Expand-Archive -Force .\youtube-float-desktop-plugin-v3.127.zip $env:TEMP\youtube-float-v3.127
+cd $env:TEMP\youtube-float-v3.127
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.127.ps1
 ```
 
 The installers copy `plugin.js` and `manifest.json` into the Hermes desktop plugin roots. The runtime plugin is intentionally self-contained; `src/` and `tests/` are development files, not installed runtime dependencies.
@@ -31,7 +31,7 @@ The installers copy `plugin.js` and `manifest.json` into the Hermes desktop plug
 1. Run the installer.
 2. Fully quit Hermes Desktop.
 3. Reopen Hermes Desktop.
-4. Confirm the pane title shows `YouTube v3.126 ★`.
+4. Confirm the pane title shows `YouTube v3.127 ★`.
 
 Closing only the pane is not a full reload.
 
@@ -48,13 +48,13 @@ python3 scripts/build-release-zip.py --output /tmp/youtube-float.zip --check
 python3 scripts/changelog-release-notes.py > /tmp/youtube-float-release-notes.md
 python3 scripts/publish-release.py --dry-run
 sh -n install-youtube-float.sh
-sh -n install-youtube-float-v3.126.sh
+sh -n install-youtube-float-v3.127.sh
 ```
 
 If available, also run:
 
 ```bash
-shellcheck install-youtube-float.sh install-youtube-float-v3.126.sh
+shellcheck install-youtube-float.sh install-youtube-float-v3.127.sh
 pwsh -NoProfile -Command "[scriptblock]::Create((Get-Content -Raw install-youtube-float.ps1)) | Out-Null"
 ```
 

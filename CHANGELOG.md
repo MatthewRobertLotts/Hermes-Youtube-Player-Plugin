@@ -1,4 +1,6 @@
-# Changelog
+## v3.127
+- Persist the playback queue and queue index across docked/floating swaps and close/reopen by mirroring them module-wide (video, position, volume, loop, captions, and quality already survived).
+- Harden placement registration so a pending pane is disposed before a new one is registered, preventing duplicate audio/decoders.
 
 ## v3.126
 - Clamp seek, rewind, and forward commands so player API calls cannot seek before zero or past known duration.

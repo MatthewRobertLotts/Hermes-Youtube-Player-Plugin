@@ -100,3 +100,12 @@ test('plugin.js playback reliability clamps seek and Shorts advance', () => {
   assert.match(plugin, /p\.seekTo\(Math\.min\(p\.getDuration\(\)/);
   assert.match(plugin, /list\.slice\(indexRef\.current \+ 1\)\.find\(i => i\?\.type === 'short'\)/);
 });
+
+
+test('plugin.js lifecycle cleanup prevents duplicate players and handlers', () => {
+  assert.match(plugin, /if \(disposePlayer\) disposePlayer\(\)/);
+  assert.match(plugin, /setActionHandler\(a, null\)/);
+  assert.match(plugin, /removesEventListener|removeEventListener/);
+  assert.match(plugin, /liveQueueState/);
+  assert.match(plugin, /queueResume/);
+});

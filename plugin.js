@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.126'
+const VERSION = 'v3.127'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -34,6 +34,7 @@ let accountPaneOpenState = false
 let playerOpenState = true
 let playerPlacementState = 'docked'
 let livePlayerState = null
+let liveQueueState = { at: 0, index: -1, items: null, mode: 'search' }
 let liveAccountState = null
 let liveDashboardResults = []
 let liveDashboardRows = { history: [], playlists: [], shorts: [], subscriptions: [], videos: [], watchlater: [] }
@@ -593,6 +594,8 @@ function YouTubeFloat({ pane = false } = {}) {
   const prefs = useMemo(() => normalisePrefs(readPrefs()), [])
   const accountPrefs = liveAccountState || prefs.account || {}
   const resume = livePlayerState && Date.now() - livePlayerState.at < SWITCH_RESUME_MS ? livePlayerState : null
+  const queueResume = liveQueueState && liveQueueState.at && Date.now() - liveQueueState.at < SWITCH_RESUME_MS ? liveQueueState : null
+  const resumedItems = queueResume ? (Array.isArray(queueResume.items) ? queueResume.items : []) : []
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState('videos')
   const [playerSize, setPlayerSize] = useState(prefs.playerSize)
@@ -601,9 +604,9 @@ function YouTubeFloat({ pane = false } = {}) {
   const mini = playerSize === 'mini'
   const [videoId, setVideoId] = useState(resume?.videoId || null)
   const [playlist, setPlaylist] = useState(resume?.playlist || null)
-  const [queueMode, setQueueMode] = useState('search')
-  const [results, setResults] = useState([])
-  const [currentIndex, setCurrentIndex] = useState(-1)
+  const [queueMode, setQueueMode] = useState(queueResume ? queueResume.mode : 'search')
+  const [results, setResults] = useState(resumedItems)
+  const [currentIndex, setCurrentIndex] = useState(queueResume ? queueResume.index : -1)
   const [status, setStatus] = useState('Search for a video')
   const [searchUrl, setSearchUrl] = useState(null)
   const [loopMode, setLoopMode] = useState(prefs.loopMode)
@@ -975,6 +978,9 @@ function YouTubeFloat({ pane = false } = {}) {
   playlistStateRef.current = playlist
   const queueModeRef = useRef(queueMode)
   queueModeRef.current = queueMode
+  // Mirror the queue in module scope so a dock/float swap or close/reopen that unmounts this
+  // component can restore the queue and its index exactly (same trick as livePlayerState).
+  liveQueueState = { at: Date.now(), index: currentIndex, items: results.length ? results : null, mode: queueMode }
   // Window after a capture during which a mismatched player videoId is expected (page reload);
   // only treat mismatches as drift once it expires.
   const driftGuardRef = useRef(0)
@@ -1579,7 +1585,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.126 ★',
+        title: 'YouTube v3.127 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

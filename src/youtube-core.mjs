@@ -307,3 +307,21 @@ export function adapterState({ signedIn = true, items = [], loading = false, err
   if (!items.length) return 'empty';
   return 'ready';
 }
+
+
+export function lifecycleStatus({ registered = false, playerOpen = true, placement = 'docked', queueItems = [], queueIndex = -1, log = [] } = {}) {
+  const live = Array.isArray(log) ? log : [];
+  const nonce = live.length ? new Set(live.map(line => String(line).split(' ')[0])).size : 0;
+  // Count distinct video IDs that are being decoded at the same lifecycle tick; more than one
+  // means two players could be decoding the same/extra video (a duplicate-audio risk).
+  const decode = (String(live.join('\n')).match(/decode[s]?:\s*([^;\s]+)/g) || []).map(x => x.replace(/^decode[s]?:\s*/, ''));
+  return {
+    ok: registered && playerOpen,
+    registered,
+    playerOpen,
+    placement: placement === 'floating' ? 'floating' : 'docked',
+    queueRestored: Array.isArray(queueItems) && queueItems.length > queueIndex && queueIndex >= 0 && String(live.join('\n')).includes('queue restored'),
+    uniqueMediaLifecycleOps: nonce,
+    simultaneousDecoders: decode.length ? new Set(decode).size : 1,
+  };
+}

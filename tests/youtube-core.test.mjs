@@ -8,6 +8,7 @@ import {
   clampTime,
   compareVersions,
   isShortUrl,
+  lifecycleStatus,
   loopAction,
   nextQueueItem,
   dedupeQueue,
@@ -185,4 +186,18 @@ test('hardens queue boundaries and duplicate/unavailable rows', () => {
   assert.equal(queueState([{ id: 'a' }, { id: 'b' }, { id: 'c' }], 1), 'middle');
   assert.deepEqual(previousQueueItem({ list: [{ id: 'a' }], index: 0 }), { previous: null, index: -1 });
   assert.deepEqual(autoAdvanceQueueItem({ list: [{ id: 's', type: 'short' }], index: 0, queueMode: 'search' }), { next: null, playlist: null, index: -1 });
+});
+
+
+test('hardens docked/floating lifecycle bookkeeping', () => {
+  const restore = lifecycleStatus({ registered: true, playerOpen: true, placement: 'floating', queueItems: [{ id: 'a' }, { id: 'b' }], queueIndex: 1, log: ['1 dispose', '2 register', '3 queue restored', '3 resume video a', '1 decode:v_a'] });
+  assert.equal(restore.registered, true);
+  assert.equal(restore.placement, 'floating');
+  assert.equal(restore.queueRestored, true);
+  assert.equal(restore.simultaneousDecoders, 1);
+  const dupeDecode = lifecycleStatus({ log: ['1 decode:v_a', '1 decode:v_a', '2 decode:v_a'] });
+  assert.equal(dupeDecode.simultaneousDecoders, 1);
+  assert.equal(lifecycleStatus({ registered: false }).registered, false);
+  assert.equal(lifecycleStatus({ placement: 'garbage' }).placement, 'docked');
+  assert.equal(lifecycleStatus({ queueItems: [{ id: 'a' }], queueIndex: 4, log: ['x resume'] }).queueRestored, false);
 });
