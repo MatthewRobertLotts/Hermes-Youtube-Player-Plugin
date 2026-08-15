@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.91-contained-media-top'
+const VERSION = 'v3.92-top-accent-contain'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1259,8 +1259,8 @@ function YouTubeDashboard() {
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: shortsRef, src: searchSrc('shorts', 'shorts') }),
     jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-2xl bg-white/[0.04] p-2', style: { gridTemplateColumns: '580px minmax(0, 1fr)', gap: 12 }, children: [
       jsxs('div', { className: 'grid min-h-0', style: { gridTemplateRows: '290px 104px', gap: 8 }, children: [
-        jsx('img', { alt: '', className: 'h-full min-h-0 w-full rounded-xl bg-black object-cover ring-1 ring-white/10', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
-        jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-xl bg-black/40 px-4 py-2 ring-1 ring-white/10', style: { gridTemplateRows: '20px 22px 32px', rowGap: 8 }, children: [
+        jsx('img', { alt: '', className: 'h-full min-h-0 w-full rounded-xl bg-black object-contain ring-1 ring-(--ui-accent)/70', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
+        jsxs('div', { className: 'grid h-full min-h-0 overflow-hidden rounded-xl bg-black/40 px-4 py-2 ring-1 ring-(--ui-accent)/70', style: { gridTemplateRows: '20px 22px 32px', rowGap: 8 }, children: [
           jsx('div', { className: 'truncate text-sm font-semibold leading-5', children: nowTitle }),
           jsxs('div', { className: 'flex items-center gap-2 text-[11px] text-(--ui-text-tertiary)', children: [
             jsx('span', { className: 'w-10 shrink-0 tabular-nums', children: fmt(current?.current || 0) }),
@@ -1276,7 +1276,7 @@ function YouTubeDashboard() {
           ] })
         ] })
       ] }),
-      jsxs('div', { className: 'grid min-h-0 overflow-hidden rounded-xl bg-black/15 p-3 ring-1 ring-white/5', style: { gridTemplateRows: '1fr auto' }, children: [
+      jsxs('div', { className: 'grid min-h-0 overflow-hidden rounded-xl bg-black/15 p-3 ring-1 ring-(--ui-accent)/70', style: { gridTemplateRows: '1fr auto' }, children: [
         jsxs('div', { className: 'min-w-0 self-start', children: [
           jsx('div', { className: 'text-[10px] font-semibold uppercase tracking-wide text-(--ui-accent)', children: 'Now playing' }),
           jsx('div', { className: 'mt-1 line-clamp-2 text-base font-semibold leading-snug', children: nowTitle }),
@@ -1341,7 +1341,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.91 ★',
+        title: 'YouTube v3.92 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

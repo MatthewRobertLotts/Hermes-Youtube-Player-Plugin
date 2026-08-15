@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.92
+- Contain thumbnails and apply accent borders.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.91
 - Contain the dashboard media top layout.
 - Updates plugin source, installer, README, and version page.
