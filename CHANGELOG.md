@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.82
+- Make dashboard cards play in the player.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.81
 - Load Shorts from a dedicated source.
 - Updates plugin source, installer, README, and version page.

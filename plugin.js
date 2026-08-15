@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.81-shorts-autoload'
+const VERSION = 'v3.82-dashboard-card-play'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -32,6 +32,8 @@ let liveDashboardResults = []
 let liveDashboardRows = { history: [], playlists: [], shorts: [], subscriptions: [], videos: [], watchlater: [] }
 let dashboardLoadFeed = null
 let dashboardPlayerCommand = null
+let dashboardPlayItem = null
+let pendingDashboardPlayItem = null
 let dashboardBackgroundLoadStarted = false
 const statusListeners = new Set()
 const emitPlayerStatus = () => statusListeners.forEach(fn => { try { fn({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }) } catch (e) {} })
@@ -1023,6 +1025,14 @@ function YouTubeFloat({ pane = false } = {}) {
     autostartArmedAtRef.current = Date.now()
     setQueueMode(entry || item ? 'playlist' : 'search')
   }
+  dashboardPlayItem = item => play(item, -1)
+  useEffect(() => {
+    if (!pendingDashboardPlayItem) return undefined
+    const item = pendingDashboardPlayItem
+    pendingDashboardPlayItem = null
+    const t = window.setTimeout(() => play(item, -1), 80)
+    return () => window.clearTimeout(t)
+  }, [])
   const playOffset = delta => { const next = results[currentIndex + delta]; if (next) play(next, currentIndex + delta) }
   useEffect(() => {
     if (!('mediaSession' in navigator)) return undefined
@@ -1211,6 +1221,7 @@ function YouTubeDashboard() {
     return () => { cancelled = true }
   }, [])
   const open = placement => { if (setPlayerPlacement) setPlayerPlacement(placement); else if (setPlayerOpen) setPlayerOpen(true) }
+  const playFromDashboard = item => { open(state.placement || 'docked'); if (dashboardPlayItem) dashboardPlayItem(item); else pendingDashboardPlayItem = item }
   const manageAccount = () => { accountPaneRequested = true; if (playerOpenState && playerPlacementState === 'docked' && openAccountPane) openAccountPane(); else open('docked') }
   const command = action => { if (dashboardPlayerCommand) void dashboardPlayerCommand(action); else open('docked') }
   const localRecent = Array.isArray(history) ? history.slice(0, 18) : []
@@ -1226,7 +1237,7 @@ function YouTubeDashboard() {
   const nowTitle = current?.title || localRecent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
   const btn = 'rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
   const metric = (label, value) => jsxs('div', { className: 'rounded-xl bg-white/[0.055] px-3 py-2', children: [jsx('div', { className: 'text-lg font-semibold leading-none', children: value }), jsx('div', { className: 'mt-0.5 text-[10px] text-(--ui-text-tertiary)', children: label })] })
-  const videoCard = item => jsxs('button', { className: 'w-40 shrink-0 text-left', onClick: () => open(state.placement || 'docked'), title: item.title || item.id, type: 'button', children: [
+  const videoCard = item => jsxs('button', { className: 'w-40 shrink-0 text-left', onClick: () => playFromDashboard(item), title: item.title || item.id, type: 'button', children: [
     jsx('img', { alt: '', className: 'aspect-video w-40 rounded-lg bg-black object-cover', src: item.thumb || ('https://i.ytimg.com/vi/' + item.id + '/mqdefault.jpg') }),
     jsx('div', { className: 'mt-1 line-clamp-2 text-xs font-medium leading-snug', children: item.title || item.id }),
     jsx('div', { className: 'mt-0.5 truncate text-[10px] text-(--ui-text-tertiary)', children: item.duration || (item.type === 'playlist' ? 'Playlist' : 'Video') })
@@ -1267,6 +1278,7 @@ function YouTubeDashboard() {
         metric('Shorts', shorts.length)
       ] })
     ] }),
+    // ponytail: dashboard shelves are one UI cluster; move/style/edit them together.
     jsxs('main', { className: 'min-h-0 overflow-y-auto pt-4', children: [
       shelf('Recommended videos', recommended, 'Loading Home recommendations…'),
       shelf('History', recent, 'Loading history…'),
@@ -1317,7 +1329,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.81 ★',
+        title: 'YouTube v3.82 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
