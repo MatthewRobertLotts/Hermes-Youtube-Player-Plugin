@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.64
+- Keep the plugin-only Big Screen fallback.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.63
 - Add fullscreen rollback path.
 - Updates plugin source, installer, README, and version page.

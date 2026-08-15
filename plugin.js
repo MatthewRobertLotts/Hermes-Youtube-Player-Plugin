@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.63-bigscreen-mask'
+const VERSION = 'v3.64-ready-mask'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -399,10 +399,17 @@ const stateScript = '(' + function () {
   let vid = ''
   try { vid = (p && typeof p.getVideoData === 'function' && p.getVideoData().video_id) || '' } catch (e) {}
   if (!vid) { const m = location.href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || location.pathname.match(/\/(?:shorts|embed)\/([a-zA-Z0-9_-]{11})/); vid = m ? m[1] : '' }
+  let playerState = null
+  try { if (p && typeof p.getPlayerState === 'function') playerState = p.getPlayerState() } catch (e) {}
   if (p && typeof p.getCurrentTime === 'function') {
-    return { ok: true, current: p.getCurrentTime() || 0, duration: p.getDuration() || 0, paused: p.isPaused ? p.isPaused() : (v ? v.paused : true), ended, endedFlag: flag, videoId: vid }
+    const current = p.getCurrentTime() || 0
+    const duration = p.getDuration() || 0
+    const paused = p.isPaused ? p.isPaused() : (v ? v.paused : true)
+    return { ok: true, current, duration, paused, ended, endedFlag: flag, videoId: vid, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
   }
-  return { ok: true, current: (v && v.currentTime) || 0, duration: (v && v.duration) || 0, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid }
+  const current = (v && v.currentTime) || 0
+  const duration = (v && v.duration) || 0
+  return { ok: true, current, duration, paused: v ? v.paused : true, ended, endedFlag: flag, videoId: vid, playerState, ready: !!vid && duration > 0 && playerState !== 3 }
 }.toString() + ')()'
 
 const playlistFillScript = '(' + function () {
@@ -513,6 +520,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const fullscreenBoxRef = useRef(null)
   const clickTimerRef = useRef(null)
   const fullscreenPausedRef = useRef(null)
+  const fullscreenMaskUntilRef = useRef(0)
   const nativeRef = useRef(false)
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch (e) { return [] } })
   const historyRef = useRef(history)
@@ -641,10 +649,8 @@ function YouTubeFloat({ pane = false } = {}) {
     if (!webview || !videoId || loginPaneRef.current) return undefined
     const applyFit = () => { try { void webview.executeJavaScript(fullscreenFitScript(localFullscreen), true) } catch (e) {} }
     applyFit()
-    const a = window.setTimeout(applyFit, 120)
-    const b = window.setTimeout(applyFit, 360)
-    const c = window.setTimeout(() => setFullscreenBusy(false), 700)
-    return () => { window.clearTimeout(a); window.clearTimeout(b); window.clearTimeout(c) }
+    const fallback = window.setTimeout(() => setFullscreenBusy(false), 3000)
+    return () => window.clearTimeout(fallback)
   }, [localFullscreen, videoId])
 
   useEffect(() => {
@@ -821,6 +827,7 @@ function YouTubeFloat({ pane = false } = {}) {
         const r = await playerRef.current?.executeJavaScript(stateScript, true)
         if (!r || !r.ok) return
         if (!interacting) setProgress({ current: r.current, duration: r.duration, paused: r.paused, videoId: r.videoId })
+        if (fullscreenBusy && Date.now() > fullscreenMaskUntilRef.current && (r.ready || r.paused)) setFullscreenBusy(false)
         if (r.videoId || videoId) livePlayerState = { at: Date.now(), current: r.current || 0, paused: r.paused, playlist, videoId: r.videoId || videoId }
         const list = resultsRef.current
         const expected = list[indexRef.current]?.id
@@ -986,6 +993,7 @@ function YouTubeFloat({ pane = false } = {}) {
   const ctrlBtn = () => cn('h-6 min-w-[52px] rounded-full border border-(--ui-border-muted) bg-(--ui-bg-editor) px-2.5 text-xs text-(--ui-text-secondary) transition hover:border-(--ui-accent) hover:text-(--ui-text-primary) disabled:opacity-50')
   const toggleFullscreen = () => {
     resumeStartRef.current = progress.current || 0
+    fullscreenMaskUntilRef.current = Date.now() + 450
     setFullscreenBusy(true)
     setLocalFullscreen(v => {
       const next = !v
@@ -1142,7 +1150,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.63 ★',
+        title: 'YouTube v3.64 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
