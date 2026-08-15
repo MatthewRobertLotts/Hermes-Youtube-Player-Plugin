@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.95
+- Put Show first in dashboard controls.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.94
 - Match top borders to scrollbar colour.
 - Updates plugin source, installer, README, and version page.

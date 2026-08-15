@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.94-scrollbar-border-colour'
+const VERSION = 'v3.95-show-first-control'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1269,11 +1269,11 @@ function YouTubeDashboard() {
             jsx('span', { className: 'w-10 shrink-0 text-right tabular-nums', children: fmt(current?.duration || 0) })
           ] }),
           jsxs('div', { className: 'grid h-8 items-center gap-2', style: { gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }, children: [
+            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show' }),
             jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, disabled: !current?.videoId, onClick: () => command('rewind'), type: 'button', children: '-10s' }),
             jsx('button', { className: 'h-8 w-full rounded-full bg-(--ui-accent) px-3 text-xs font-semibold text-(--ui-accent-contrast) hover:brightness-110 disabled:opacity-50', style: { border: '1px solid ' + DASH_BORDER }, disabled: !current?.videoId, onClick: () => command('playPause'), type: 'button', children: current?.paused ? 'Play' : 'Pause' }),
             jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, disabled: !current?.videoId, onClick: () => command('forward'), type: 'button', children: '+10s' }),
-            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, disabled: !current?.videoId, onClick: () => open(state.placement || 'docked'), type: 'button', children: 'Show' }),
-            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), onClick: manageAccount, type: 'button', children: state.accountOpen ? 'Close' : (account.signedIn ? 'Account' : 'Sign in') })
+            jsx('button', { className: cn(btn, 'h-8 w-full px-0'), style: { borderColor: DASH_BORDER }, onClick: manageAccount, type: 'button', children: state.accountOpen ? 'Close' : (account.signedIn ? 'Account' : 'Sign in') })
           ] })
         ] })
       ] }),
@@ -1342,7 +1342,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.94 ★',
+        title: 'YouTube v3.95 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
