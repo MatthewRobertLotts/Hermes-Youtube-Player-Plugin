@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.82-dashboard-card-play'
+const VERSION = 'v3.83-history-no-shorts'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1228,11 +1228,12 @@ function YouTubeDashboard() {
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
   const homeItems = rows.recommended || []
+  const rawHistory = (rows.history || []).length ? rows.history : localRecent
   const recommended = homeItems.filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
-  const recent = ((rows.history || []).length ? rows.history : localRecent).slice(0, 18)
+  const recent = rawHistory.filter(x => x.type !== 'short').slice(0, 18)
   const subscriptions = (rows.subscriptions || []).slice(0, 18)
   const watchlater = (rows.watchlater || []).slice(0, 18)
-  const shorts = (rows.shorts || []).concat(homeItems.filter(x => x.type === 'short'), recent.filter(x => x.type === 'short')).slice(0, 18)
+  const shorts = (rows.shorts || []).concat(homeItems.filter(x => x.type === 'short'), rawHistory.filter(x => x.type === 'short')).slice(0, 18)
   const playlists = (rows.playlists || []).slice(0, 18)
   const nowTitle = current?.title || localRecent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
   const btn = 'rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
@@ -1329,7 +1330,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.82 ★',
+        title: 'YouTube v3.83 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
