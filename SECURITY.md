@@ -42,6 +42,24 @@ The plugin should not store, print, copy, or intentionally expose:
 
 CI guards block obvious cookie/session access patterns in `plugin.js`.
 
+## Integration API trust boundary (v1)
+
+The player exposes a small read/control surface to other Hermes Desktop plugins over a shared
+`window` `CustomEvent` channel (`hermes:youtube:api` / `:response` / `:event`), contract-versioned
+at `v1`.
+
+- This API is **not a new privilege boundary.** A Hermes plugin already runs in the renderer with
+  app-wide authority; the API only narrows *what the player hands out* to external callers.
+- It exposes normalized read state and validated controls only. It never hands out:
+  - cookies, OAuth/session tokens, authorization headers, YouTube credentials;
+  - raw webview handles or unrestricted `executeJavaScript` access;
+  - `ytInitialData`, DOM, renderer, or player implementation internals.
+- Controls are validated before acting (`seekTo` rejects NaN/Infinity/negative/missing; unknown
+  methods/versions are refused), so a caller cannot drive the player into an unsafe state or abuse
+  it as a code-execution point.
+- The trust assumption is: **any consumer is considered as trusted as any plugin on the same
+  renderer** (the disk door is local-user-only). The API adds no remote-callable surface.
+
 ## `executeJavaScript` boundary
 
 The plugin uses `webview.executeJavaScript` to talk to YouTube pages because YouTube data is rendered inside the signed-in webview session.

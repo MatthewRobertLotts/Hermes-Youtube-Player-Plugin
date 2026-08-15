@@ -342,3 +342,127 @@ export function boundedInterval(mode) {
   // open-but-unused player is not hammering executeJavaScript all session.
   return mode === 'play' ? 450 : 1000;
 }
+
+
+// ---- Player Integration API (v1) ---------------------------------------------
+// The player exposes a small, stable surface to other Hermes Desktop plugins via a
+// shared-`window` CustomEvent channel (runtime plugins run as ESM in the same renderer;
+// the SDK has no plugin->plugin RPC). All contract logic lives here so it is unit-tested
+// without a DOM. The bridge in plugin.js only marshals to/from window events.
+
+export const PLAYER_API = Object.freeze({
+  version: 1,
+  plugin: 'youtube-float',
+  events: Object.freeze({
+    videoChanged: 'videoChanged',
+    playbackStateChanged: 'playbackStateChanged',
+    queueChanged: 'queueChanged',
+    playerOpened: 'playerOpened',
+    playerClosed: 'playerClosed',
+  }),
+  readMethods: Object.freeze(['getApiInfo', 'getCurrentVideo', 'getPlaybackState', 'getQueue', 'getAccountState', 'getChapters']),
+  controlMethods: Object.freeze(['play', 'pause', 'seekTo', 'next', 'previous']),
+  controlParamNames: Object.freeze({ play: [], pause: [], next: [], previous: [], seekTo: ['seconds'] }),
+});
+const API = PLAYER_API;
+
+export function apiSupportsVersion(version) {
+  return Number.isInteger(version) && version >= 1 && version <= API.version;
+}
+
+export function parseApiMessage(data) {
+  if (!data || typeof data !== 'object') return { ok: false, error: 'malformed message' };
+  const version = Number(data.v) || Number(data.version) || API.version;
+  if (!apiSupportsVersion(version)) return { ok: false, error: 'unsupported api version' };
+  const method = data.method;
+  if (typeof method !== 'string' || !method.trim()) return { ok: false, error: 'missing method' };
+  const params = data.params === undefined ? {} : data.params;
+  if (params === null || typeof params !== 'object' || Array.isArray(params)) return { ok: false, error: 'invalid params' };
+  return { ok: true, version, id: data.id ?? null, method, params };
+}
+
+export function isReadMethod(method) { return API.readMethods.includes(method); }
+export function isControlMethod(method) { return API.controlMethods.includes(method); }
+
+export function coerceFiniteNumber(value, fallback = null) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') { const n = Number(value); if (Number.isFinite(n)) return n; }
+  return fallback;
+}
+
+export function clampSeekSeconds(value, duration = 0) {
+  const n = coerceFiniteNumber(value);
+  if (n === null) return { ok: false, error: 'seekTo requires a finite number of seconds' };
+  if (n < 0) return { ok: false, error: 'seekTo must be non-negative' };
+  const d = coerceFiniteNumber(duration) ?? 0;
+  return { ok: true, seconds: d > 0 ? Math.min(n, d) : n };
+}
+
+export function validateControl(method, params) {
+  if (!isControlMethod(method)) return { ok: false, error: `unknown method: ${method}` };
+  if (method === 'seekTo') return clampSeekSeconds(params?.seconds);
+  return { ok: true, seconds: null };
+}
+
+export function apiError(code, message, id = null) {
+  return { ok: false, error: message, code: code || 'api_error', id };
+}
+export function apiOk(value, id = null) {
+  return { ok: true, value, id };
+}
+
+export function normalizeVideo(video, playback) {
+  const v = video || {};
+  return {
+    videoId: v.videoId || null,
+    canonicalUrl: v.canonicalUrl || (v.videoId ? `https://www.youtube.com/watch?v=${v.videoId}` : null),
+    title: typeof v.title === 'string' ? v.title : null,
+    channel: typeof v.channel === 'string' ? v.channel : null,
+    currentTime: coerceFiniteNumber(playback?.currentTime) ?? 0,
+    duration: coerceFiniteNumber(v.duration) ?? 0,
+    description: typeof v.description === 'string' ? v.description : null,
+    chapters: Array.isArray(v.chapters) ? v.chapters : [],
+    isShort: !!v.isShort,
+    isLive: !!v.isLive,
+    playlistId: v.playlistId || null,
+  };
+}
+
+export function normalizePlaybackState({ videoId = null, paused = true, currentTime = 0, duration = 0, muted = false, volume = 1, loopMode = 'off', playerOpen = false, placement = 'docked' } = {}) {
+  return {
+    videoId: videoId || null,
+    paused: !!paused,
+    currentTime: coerceFiniteNumber(currentTime) ?? 0,
+    duration: coerceFiniteNumber(duration) ?? 0,
+    muted: !!muted,
+    volume: Math.max(0, Math.min(1, coerceFiniteNumber(volume) ?? 1)),
+    loopMode: ['off', 'once', 'inf'].includes(loopMode) ? loopMode : 'off',
+    playing: !!videoId && !paused,
+    playerOpen: !!playerOpen,
+    placement: placement === 'floating' ? 'floating' : 'docked',
+  };
+}
+
+export function normalizeQueue({ mode = 'search', items = [], index = -1, playlistId = null } = {}) {
+  return {
+    mode: ['search', 'playlist'].includes(mode) ? mode : 'search',
+    items: Array.isArray(items) ? items.map(i => ({
+      id: i?.id || null,
+      title: i?.title || null,
+      type: i?.type || 'video',
+      ...(i?.duration ? { duration: i.duration } : {}),
+    })).slice(0, 200) : [],
+    index: Number.isInteger(index) ? index : -1,
+    playlistId: playlistId || null,
+  };
+}
+
+export function normalizeChapters(chapters = []) {
+  if (!Array.isArray(chapters)) return { ok: true, chapters: [] };
+  const out = chapters.filter(c => c && coerceFiniteNumber(c.startTime) !== null).map(c => ({
+    startTime: coerceFiniteNumber(c?.startTime) || 0,
+    endTime: coerceFiniteNumber(c?.endTime) ?? null,
+    title: typeof c?.title === 'string' ? c.title : (c?.title || null),
+  }));
+  return { ok: true, chapters: out };
+}

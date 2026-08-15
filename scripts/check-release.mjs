@@ -35,6 +35,8 @@ const required = [
   'TROUBLESHOOTING.md',
   'CONTRIBUTING.md',
   'ARCHITECTURE.md',
+  'INTEGRATION_API.md',
+  'docs/api-example-consumer.md',
   'PERFORMANCE.md',
   'docs/release-tests/v3.129-responsive-ux-accessibility.md',
 ];
@@ -86,15 +88,20 @@ const changelogVersions = [...changelog.matchAll(/^## (v\d+\.\d+(?:\.\d+)?)$/gm)
 const duplicateChangelogVersions = changelogVersions.filter((v, i) => changelogVersions.indexOf(v) !== i);
 if (duplicateChangelogVersions.length) fail(`duplicate CHANGELOG versions: ${[...new Set(duplicateChangelogVersions)].join(', ')}`);
 // The changelog is the source of truth for release notes, so a deleted heading silently fuses one
-// version's notes into another. Require a contiguous descending integer run from the current
-// version down to v3.108 (the release-series floor) with no gaps.
-const floor = 108;
-const currentMinor = Number((version.match(/^v(\d+)\.(\d+)/) || [])[2]);
-if (!Number.isInteger(currentMinor)) fail('cannot derive changelog series from version');
-const present = new Set(changelogVersions.map(v => v.replace(/^v3\.(\d+)\.\d+$/, 'v3.$1')).filter(v => /^v3\.\d+$/.test(v)));
-const missing = [];
-for (let m = currentMinor; m >= floor; m -= 1) if (!present.has(`v3.${m}`)) missing.push(`v3.${m}`);
-if (missing.length) fail(`CHANGELOG gap: ${missing.join(', ')} — release notes would be fused/contaminated`);
+// version's notes into another. Require a bijection between CHANGELOG headings and per-version
+// docs/versions/vX.Y.md files (every heading must have a doc, every doc a heading). This catches
+// a deleted/fused entry without assuming a contiguous integer series (releases need not be dense).
+// Scoped to the modern series (minor >= 100) so old one-off entries (e.g. "## v3.0 ★") don't trip.
+const isModern = v => /^v\d+\.\d+(?:\.\d+)?$/.test(v) && Number((v.match(/^v(\d+)\.(\d+)/) || [])[2]) >= 100;
+const changelogSet = new Set(changelogVersions);
+const docDir = path.join(root, 'docs', 'versions');
+const docVersions = fs.existsSync(docDir)
+  ? fs.readdirSync(docDir).filter(f => /^v\d+\.\d+(?:\.\d+)?\.md$/.test(f)).map(f => f.replace(/\.md$/, ''))
+  : [];
+const changelogWithoutDoc = changelogVersions.filter(v => isModern(v) && !docVersions.includes(v));
+const docWithoutChangelog = docVersions.filter(v => isModern(v) && !changelogSet.has(v));
+if (changelogWithoutDoc.length) fail(`CHANGELOG entries without a matching docs/versions file: ${changelogWithoutDoc.join(', ')}`);
+if (docWithoutChangelog.length) fail(`docs/versions files without a CHANGELOG entry: ${docWithoutChangelog.join(', ')}`);
 // Guard against a broken/mangled changelog body: if the current version's entry contains any
 // other version heading, its body is contaminated and would corrupt the generated release notes.
 const entryMatch = changelog.match(new RegExp(`^## ${version}\\n(?<body>.*?)(?=^## v\\d+\\.\\d+(?:\\.\\d+)?\\n|\\Z)`, 'ms'));
@@ -109,7 +116,9 @@ for (const file of ['install-youtube-float.ps1', `install-youtube-float-${versio
 
 const syntax = spawnSync('node', ['--check', path.join(root, 'plugin.js')], { encoding: 'utf8' });
 if (syntax.status !== 0) fail(`node --check failed\n${syntax.stderr}`);
-const testFiles = fs.readdirSync(path.join(root, 'tests')).filter(f => f.endsWith('.test.mjs')).map(f => path.join('tests', f));
+const testFiles = fs.readdirSync(path.join(root, 'tests'))
+  .filter(f => f.endsWith('.test.mjs'))
+  .map(f => path.join('tests', f));
 if (!testFiles.length) fail('no Node test files found');
 const tests = spawnSync('node', ['--test', ...testFiles], { cwd: root, encoding: 'utf8' });
 if (tests.status !== 0) fail(`node --test failed\n${tests.stdout}\n${tests.stderr}`);

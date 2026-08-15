@@ -85,6 +85,10 @@ Debug diagnostics are opt-in. `diag()` records bounded labelled events and `diag
 
 The in-plugin update check calls GitHub Releases latest metadata, validates the tagged zip artifact, downloads it only into memory for validation, and falls back to the release page unless Hermes exposes an explicit updater/write bridge. Repository scripts build the zip, generate release notes from CHANGELOG, validate consistency, and dry-run publication.
 
+### Player integration API (v1)
+
+The player exposes a small read/control surface to other Hermes Desktop plugins over a shared-`window` CustomEvent channel (`hermes:youtube:api` request/response + `:event` pushes), contract-versioned at `v1`. Other desktop plugins are same-renderer ESM and the SDK has no plugin-to-plugin RPC, so `window` CustomEvents are the mechanism; `src/youtube-core.mjs` holds the version/validation/normalization logic and `tests/api-contract.test.mjs` + `tests/plugin-runtime-parity.test.mjs` freeze it. It never exposes cookies/tokens/credentials/webview handles/`executeJavaScript`. See `INTEGRATION_API.md` and `docs/api-example-consumer.md`.
+
 ## Trust boundary
 
 ### YouTube web content
@@ -135,12 +139,12 @@ Compatibility fixes should patch one adapter and add an offline fixture or parit
 
 ## Manual playback reliability testing
 
-Live Hermes/Electron/YouTube behavior is tracked in `docs/release-tests/v3.130-playback-reliability.md`. Keep CI deterministic; do not pretend live webview behavior is covered by unit tests.
+Live Hermes/Electron/YouTube behavior is tracked in `docs/release-tests/v3.140-playback-reliability.md`. Keep CI deterministic; do not pretend live webview behavior is covered by unit tests.
 
 ### Docked/Floating lifecycle
 
-See `docs/release-tests/v3.130-docked-floating-lifecycle.md`. In-UI placement swaps and close/reopen are the signature feature; keep them regression-checked manually in real Hermes.
+See `docs/release-tests/v3.140-docked-floating-lifecycle.md`. In-UI placement swaps and close/reopen are the signature feature; keep them regression-checked manually in real Hermes.
 
 ### Responsive & accessibility
 
-Manual desktop-size/scaling/a11y checks live in `docs/release-tests/v3.130-responsive-ux-accessibility.md`. UI polish must not become a redesign.
+Manual desktop-size/scaling/a11y checks live in `docs/release-tests/v3.140-responsive-ux-accessibility.md`. UI polish must not become a redesign.

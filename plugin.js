@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.130'
+const VERSION = 'v3.140'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -814,6 +814,7 @@ function YouTubeFloat({ pane = false } = {}) {
     livePlayerState = { at: Date.now(), current: 0, paused: false, playlist: list || null, title: meta.title || '', thumb: meta.thumb || '', videoId: vid }
     driftGuardRef.current = Date.now() + 2000
     autostartRef.current = 0
+    try { postApiEvent('videoChanged', { videoId: vid, playlistId: list || null }) ; postApiEvent('playbackStateChanged', { paused: false }) } catch (e) {}
   }
 
   // Player loads the watch page; we strip chrome, default captions off, and read the subtitle
@@ -991,6 +992,8 @@ function YouTubeFloat({ pane = false } = {}) {
   // Mirror the queue in module scope so a dock/float swap or close/reopen that unmounts this
   // component can restore the queue and its index exactly (same trick as livePlayerState).
   liveQueueState = { at: Date.now(), index: currentIndex, items: results.length ? results : null, mode: queueMode }
+  const qSig = queueMode + ':' + currentIndex + ':' + (results.length || 0)
+  if (qSig !== lastQueueEmitted) { lastQueueEmitted = qSig; postApiEvent('queueChanged', { mode: queueMode === 'playlist' ? 'playlist' : 'search', index: currentIndex, count: results.length }) }
   // Window after a capture during which a mismatched player videoId is expected (page reload);
   // only treat mismatches as drift once it expires.
   const driftGuardRef = useRef(0)
@@ -1065,6 +1068,7 @@ function YouTubeFloat({ pane = false } = {}) {
 
   const runCommand = async (action, value) => {
     try {
+      if (action === 'next' || action === 'previous') { playOffset(action === 'next' ? 1 : -1); setProgress(p => ({ ...p })); return }
       if (action === 'caption') {
         const cap = captions.find(c => c.lang === value || c.label === value)
         // 1) YouTube's own caption controller (renders in the whitelisted caption window).
@@ -1576,12 +1580,119 @@ function YouTubeStatusChip() {
 }
 
 
+// ---- Player Integration API bridge (v1) --------------------------------------
+// Exposes a small, stable surface to OTHER Hermes Desktop plugins over a shared-window
+// CustomEvent channel (runtime plugins are same-renderer ESM; the SDK has no plugin->plugin
+// RPC). Contract/normalization logic is mirrored in src/youtube-core.mjs and frozen by
+// tests/api-contract.test.mjs + plugin-runtime-parity.test.mjs so they cannot drift.
+// Never exposes cookies/tokens/credentials/webview handles/unrestricted executeJavaScript.
+const INT_API_V = 1
+const INT_API_CHANNEL = 'hermes:youtube:api'                  // consumer -> player (query/control)
+const INT_API_RESPONSE = 'hermes:youtube:api:response'        // player -> consumer (reply)
+const INT_API_EVENT = 'hermes:youtube:api:event'              // player -> consumer (pushed event)
+const INT_READ = ['getApiInfo', 'getCurrentVideo', 'getPlaybackState', 'getQueue', 'getAccountState', 'getChapters']
+const INT_CONTROL = ['play', 'pause', 'seekTo', 'next', 'previous']
+let intApiListener = null
+let lastQueueEmitted = ''
+const intFinite = v => {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'string' && v.trim() !== '') { const n = Number(v); return Number.isFinite(n) ? n : null }
+  return null
+}
+const postApiEvent = (type, payload) => {
+  try { window.dispatchEvent(new CustomEvent(INT_API_EVENT, { detail: Object.assign({ v: INT_API_V, type }, payload || {}) })) } catch (e) {}
+}
+const postApiReply = (id, body) => {
+  try { window.dispatchEvent(new CustomEvent(INT_API_RESPONSE, { detail: Object.assign({ v: INT_API_V, id }, body) })) } catch (e) {}
+}
+const apiReadSnapshot = method => {
+  if (method === 'getApiInfo') return { plugin: 'youtube-float', apiVersion: INT_API_V, playerVersion: VERSION }
+  if (method === 'getCurrentVideo') {
+    const s = livePlayerState || {}
+    return {
+      videoId: s.videoId || null,
+      canonicalUrl: s.videoId ? 'https://www.youtube.com/watch?v=' + s.videoId : null,
+      title: typeof s.title === 'string' ? s.title : null,
+      channel: typeof s.channel === 'string' ? s.channel : null,
+      currentTime: intFinite(s.current) ?? 0,
+      duration: intFinite(s.duration) ?? 0,
+      description: typeof s.description === 'string' ? s.description : null,
+      chapters: [],
+      isShort: !!s.isShort,
+      isLive: !!s.isLive,
+      playlistId: s.playlist || null,
+    }
+  }
+  if (method === 'getPlaybackState') {
+    const s = livePlayerState || {}
+    return {
+      videoId: s.videoId || null,
+      paused: s.paused !== false,
+      currentTime: intFinite(s.current) ?? 0,
+      duration: intFinite(s.duration) ?? 0,
+      playing: !!s.videoId && s.paused === false,
+      playerOpen: playerOpenState,
+      placement: playerPlacementState === 'floating' ? 'floating' : 'docked',
+    }
+  }
+  if (method === 'getQueue') {
+    const q = liveQueueState || { mode: 'search', items: null, index: -1 }
+    return {
+      mode: q.mode === 'playlist' ? 'playlist' : 'search',
+      items: Array.isArray(q.items) ? q.items.map(i => ({ id: i?.id || null, title: i?.title || null, type: i?.type || 'video' })) : [],
+      index: Number.isInteger(q.index) ? q.index : -1,
+      playlistId: q.playlistId || null,
+    }
+  }
+  if (method === 'getAccountState') {
+    const a = liveAccountState || {}
+    return { signedIn: !!a.signedIn, name: typeof a.name === 'string' ? a.name : null }
+  }
+  if (method === 'getChapters') return []
+  return null
+}
+const apiRunControl = async (method, params, id) => {
+  if (!dashboardPlayerCommand) return postApiReply(id, { ok: false, code: 'player_closed', error: 'player is closed' })
+  try {
+    if (method === 'seekTo') {
+      const n = intFinite(params && params.seconds)
+      if (n === null) return postApiReply(id, { ok: false, code: 'invalid_argument', error: 'seekTo requires a finite number of seconds' })
+      if (n < 0) return postApiReply(id, { ok: false, code: 'invalid_argument', error: 'seekTo must be non-negative' })
+      const dur = intFinite(livePlayerState && livePlayerState.duration) || 0
+      await dashboardPlayerCommand('seek', dur > 0 ? Math.min(n, dur) : n)
+      return postApiReply(id, { ok: true, value: null })
+    }
+    await dashboardPlayerCommand(method)
+    return postApiReply(id, { ok: true, value: null })
+  } catch (e) {
+    return postApiReply(id, { ok: false, code: 'player_error', error: 'control failed' })
+  }
+}
+const apiHandleMessage = async (data) => {
+  if (!data || typeof data !== 'object' || typeof data.method !== 'string') return
+  const v = intFinite(data.v) ?? INT_API_V
+  if (v < 1 || v > INT_API_V) return
+  const id = data.id ?? null
+  const method = data.method
+  if (INT_READ.includes(method)) return postApiReply(id, { ok: true, value: apiReadSnapshot(method) })
+  if (INT_CONTROL.includes(method)) return apiRunControl(method, data.params, id)
+  return postApiReply(id, { ok: false, code: 'unknown_method', error: 'unknown method: ' + method })
+}
+const installIntegrationListener = () => {
+  if (intApiListener) return
+  intApiListener = e => { void apiHandleMessage(e && e.detail) }
+  try { window.addEventListener(INT_API_CHANNEL, intApiListener) } catch (err) {}
+}
+
+
 export default {
   id: 'youtube-float',
   name: 'YouTube Float',
   description: 'Native Hermes YouTube player: switchable docked/floating pane, page, sidebar, palette, status bar, and persistent player preferences.',
   register(ctx) {
     pluginStorage = ctx.storage
+    installIntegrationListener()
+    postApiEvent('ready')
     let disposePlayer = null
     const closeTool = () => [{ id: 'close', icon: jsx(Codicon, { name: 'chrome-close', size: '0.8125rem' }), label: 'Close YouTube player', onSelect: () => { if (closePlayerPane) closePlayerPane() } }]
     const noPluginCloseMenu = tab => jsx('span', { onContextMenu: e => { e.preventDefault(); e.stopPropagation() }, children: tab })
@@ -1596,13 +1707,14 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.130 ★',
+        title: 'YouTube v3.140 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
       playerOpenState = true
       playerPlacementState = placement === 'floating' ? 'floating' : 'docked'
       emitPlayerStatus()
+      postApiEvent('playerOpened', { placement: playerPlacementState })
     }
     setPlayerOpen = open => {
       playerOpenState = open !== false
@@ -1611,6 +1723,7 @@ export default {
         if (disposePlayer) disposePlayer()
         disposePlayer = null
         emitPlayerStatus()
+        postApiEvent('playerClosed', {})
         return
       }
       registerPlayer(readPrefs().placement === 'floating' ? 'floating' : 'docked')

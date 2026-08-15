@@ -1,3 +1,6 @@
+## v3.140
+- Add player integration API v1: a small, stable read/control surface for other Hermes Desktop plugins over a shared-window CustomEvent channel ({getApiInfo,getCurrentVideo,getPlaybackState,getQueue,getAccountState,getChapters} reads; play/pause/seekTo/next/previous controls; videoChanged/playbackStateChanged/queueChanged/playerOpened/playerClosed/ready events). Version-nullable defaults so a consumer never breaks when the player closes, nothing is loaded, the queue is absent, or signed-in state changes. No cookies/tokens/credentials/webview handles exposed. Contract frozen by tests/api-contract.test.mjs and plugin-runtime-parity.test.mjs. Docs: INTEGRATION_API.md + docs/api-example-consumer.md; SECURITY.md trust-boundary section added.
+
 ## v3.130
 - Stable Player milestone: full release audit. No new player features, no redesign.
 - Restore missing CHANGELOG headings (v3.128/v3.127) so generated release notes are no longer fused; add a CI guard that fails on any changelog gap from v3.108 to the current version.

@@ -110,6 +110,27 @@ test('plugin.js keeps persistent webview sources stable across renders', () => {
 });
 
 
+test('plugin.js ships the integration API v1 bridge without leaking secrets', () => {
+  assert.match(plugin, /INT_API_V = 1/);
+  assert.match(plugin, /hermes:youtube:api/);
+  assert.match(plugin, /installIntegrationListener\(\)/);
+  assert.match(plugin, /postApiEvent\('ready'\)/);
+  for (const m of ['getApiInfo', 'getCurrentVideo', 'getPlaybackState', 'getQueue', 'getAccountState', 'getChapters']) {
+    assert.match(plugin, new RegExp(`'${m}'`), `missing read method ${m}`);
+  }
+  for (const m of ['play', 'pause', 'seekTo', 'next', 'previous']) {
+    assert.match(plugin, new RegExp(`'${m}'`), `missing control method ${m}`);
+  }
+  // The bridge must never hand out executeJavaScript / cookies / tokens / credentials.
+  const bridgeBlock = plugin.split('// ---- Player Integration API bridge')[1]?.split('export default {')[0] || '';
+  assert.equal(plugin.split('// ---- Player Integration API bridge').length >= 2, true, 'bridge marker present');
+  assert.doesNotMatch(bridgeBlock, /executeJavaScript\(/);
+  assert.doesNotMatch(bridgeBlock, /document\.cookie|getAllCookies|cookies\.get|sessionStorage/);
+  assert.doesNotMatch(bridgeBlock, /setItem\(\s*['"][^'"]*(?:token|credential)/i);
+  assert.match(bridgeBlock, /unknown method/); // error path present
+});
+
+
 test('plugin.js lifecycle cleanup prevents duplicate players and handlers', () => {
   assert.match(plugin, /if \(disposePlayer\) disposePlayer\(\)/);
   assert.match(plugin, /setActionHandler\(a, null\)/);
