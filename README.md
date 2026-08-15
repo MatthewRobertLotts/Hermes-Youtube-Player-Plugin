@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ESM-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
   <img src="https://img.shields.io/badge/Hermes-Desktop-6f42c1" alt="Hermes Desktop">
-  <img src="https://img.shields.io/badge/Current-v3.122-blue" alt="Current v3.122">
+  <img src="https://img.shields.io/badge/Current-v3.123-blue" alt="Current v3.123">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
   <img src="https://github.com/MatthewRobertLotts/Hermes-Youtube-Player-Plugin/actions/workflows/check.yml/badge.svg" alt="Check">
 </p>
@@ -25,6 +25,15 @@
 <p align="center">
   <img src="assets/demo.gif" alt="Demo of Hermes YouTube Player Plugin searching, playing, and controlling YouTube inside Hermes Desktop" width="520">
 </p>
+
+---
+
+## Developer docs
+
+- [Contributing](CONTRIBUTING.md)
+- [Architecture](ARCHITECTURE.md)
+- [Security and privacy](SECURITY.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
 
 ---
 
@@ -144,7 +153,7 @@ Playlist results open into a playable queue, autoplay the first item, and roll t
 ### Windows PowerShell
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.122.ps1
+powershell -ExecutionPolicy Bypass -File .\install-youtube-float-v3.123.ps1
 ```
 
 Writes to `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\desktop-plugins`, plus profile plugin folders when present.
@@ -152,14 +161,14 @@ Writes to `%LOCALAPPDATA%\hermes\desktop-plugins` and `%USERPROFILE%\.hermes\des
 ### macOS / Linux
 
 ```bash
-chmod +x ./install-youtube-float-v3.122.sh
-./install-youtube-float-v3.122.sh
+chmod +x ./install-youtube-float-v3.123.sh
+./install-youtube-float-v3.123.sh
 ```
 
 Writes to `~/.hermes/desktop-plugins`, `$HERMES_HOME/desktop-plugins` when set, macOS `~/Library/Application Support/hermes/desktop-plugins`, and profile plugin folders when present.
 
 3. Fully quit and reopen Hermes Desktop.
-4. Confirm the pane title shows **YouTube v3.122 ★**.
+4. Confirm the pane title shows **YouTube v3.123 ★**.
 
 ---
 

@@ -1,0 +1,39 @@
+name: Feature request
+about: Suggest a small Hermes YouTube Player improvement
+labels: enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep this repo focused on the Hermes media player. Transcript, LLM, semantic-search, and video-intelligence features belong in a separate future plugin.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: The smallest change that would solve it.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Area
+      options:
+        - Docked/floating player
+        - /youtube dashboard
+        - Account/session
+        - History
+        - Subscriptions
+        - Watch Later
+        - Shorts
+        - Playlists
+        - Installer/release tooling
+        - Other
+    validations:
+      required: true

@@ -10,8 +10,32 @@ body:
     id: version
     attributes:
       label: Plugin version
-      description: Example: v3.122. The pane title shows this as `YouTube vX.Y ★`.
-      placeholder: v3.122
+      description: Example: v3.123. The pane title shows this as `YouTube vX.Y ★`.
+      placeholder: v3.123
+    validations:
+      required: true
+  - type: input
+    id: hermes_version
+    attributes:
+      label: Hermes version
+      placeholder: e.g. Hermes Desktop version from About/settings
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: e.g. Windows 11, macOS, Ubuntu
+    validations:
+      required: true
+  - type: dropdown
+    id: signed_in
+    attributes:
+      label: Signed into YouTube?
+      options:
+        - Yes
+        - No
+        - Not sure
     validations:
       required: true
   - type: dropdown

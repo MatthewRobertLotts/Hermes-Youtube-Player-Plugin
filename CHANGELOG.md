@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.123
+- Add contributor setup, reload, validation, diagnostics, and safe bug-reporting documentation.
+- Add architecture documentation for Hermes lifecycle, adapters, queue/state, trust boundaries, diagnostics, and release tooling.
+- Add a focused feature-request issue template and expand bug reports with Hermes version, OS, and YouTube sign-in state.
+
 ## v3.122
 - Add parity tests that execute the shipped `plugin.js` URL/version helper snippets against `src/youtube-core.mjs`.
 - Expand offline coverage for URL extraction, playlist/timestamp parsing, queue boundaries, loop modes, persisted preference normalisation, and release comparison.

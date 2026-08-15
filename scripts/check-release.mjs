@@ -32,6 +32,8 @@ const required = [
   'SECURITY.md',
   '.github/ISSUE_TEMPLATE/bug_report.yml',
   'TROUBLESHOOTING.md',
+  'CONTRIBUTING.md',
+  'ARCHITECTURE.md',
 ];
 for (const file of required) if (!exists(file)) fail(`missing ${file}`);
 
