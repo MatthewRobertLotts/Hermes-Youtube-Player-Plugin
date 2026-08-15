@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.79-shorts-playlists-autoload'
+const VERSION = 'v3.80-short-playlist-filter'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -116,7 +116,7 @@ const scrapeSearchScript = '(' + function () {
   const firstThumb = obj => { if (!obj) return ''; try { const m = JSON.stringify(obj).match(/"url":"(https:[^"]{10,})"/); return m ? m[1] : '' } catch (e) { return '' } }
   const badge = obj => { if (!obj) return ''; try { const m = JSON.stringify(obj).match(/"text":"([^"]{1,24}?(?:videos?|episodes?))"/i); return m ? m[1] : '' } catch (e) { return '' } }
   const walk = o => {
-    if (out.length >= 14 || !o) return
+    if (out.length >= 48 || !o) return
     if (Array.isArray(o)) { for (const x of o) walk(x); return }
     if (typeof o !== 'object') return
     if (o.constructor && o.constructor.name === 'Object') {
@@ -1186,9 +1186,14 @@ function YouTubeDashboard() {
           const res = await ref.current?.executeJavaScript(scrapeSearchScript, true)
           const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title)
           if (clean.length) {
-            liveDashboardRows[key] = key === 'playlists' ? clean.map(i => ({ ...i, type: 'playlist' })) : clean
-            emitPlayerStatus()
-            return
+            const rowItems = key === 'playlists'
+              ? clean.filter(i => /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) || /^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.list || '') || i.type === 'playlist').map(i => ({ ...i, id: (/^(PL|RD|OLAK5uy|UU|FL|LL|WL)/.test(i.id) ? i.id : (i.list || i.id)), type: 'playlist' }))
+              : clean
+            if (rowItems.length) {
+              liveDashboardRows[key] = rowItems
+              emitPlayerStatus()
+              return
+            }
           }
         } catch (e) {}
         if (attempt < 10) tick(attempt + 1)
@@ -1303,7 +1308,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.79 ★',
+        title: 'YouTube v3.80 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })

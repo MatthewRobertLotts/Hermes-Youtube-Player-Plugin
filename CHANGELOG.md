@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.80
+- Filter Shorts and Playlist shelf data.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.79
 - Add Shorts and Playlists autoloading.
 - Updates plugin source, installer, README, and version page.
