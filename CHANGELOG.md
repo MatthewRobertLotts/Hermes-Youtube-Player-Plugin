@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.79
+- Add Shorts and Playlists autoloading.
+- Updates plugin source, installer, README, and version page.
+
 ## v3.78
 - Autoload dashboard shelves in background.
 - Updates plugin source, installer, README, and version page.

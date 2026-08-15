@@ -2,7 +2,7 @@ import { Codicon, cn, host } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const VERSION = 'v3.78-background-dashboard-load'
+const VERSION = 'v3.79-shorts-playlists-autoload'
 const SEARCH_FILTERS = [
   ['videos', 'Videos'],
   ['shorts', 'Shorts'],
@@ -1165,6 +1165,7 @@ function YouTubeDashboard() {
   const historyRef = useRef(null)
   const subsRef = useRef(null)
   const watchLaterRef = useRef(null)
+  const playlistsRef = useRef(null)
   const [state, setState] = useState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState })
   useEffect(() => { statusListeners.add(setState); setState({ accountOpen: accountPaneOpenState, open: playerOpenState, placement: playerPlacementState }); return () => statusListeners.delete(setState) }, [])
   useEffect(() => {
@@ -1174,7 +1175,8 @@ function YouTubeDashboard() {
       ['recommended', homeRef],
       ['history', historyRef],
       account.signedIn ? ['subscriptions', subsRef] : null,
-      account.signedIn ? ['watchlater', watchLaterRef] : null
+      account.signedIn ? ['watchlater', watchLaterRef] : null,
+      account.signedIn ? ['playlists', playlistsRef] : null
     ].filter(Boolean)
     let cancelled = false
     jobs.forEach(([key, ref], jobIndex) => {
@@ -1184,7 +1186,7 @@ function YouTubeDashboard() {
           const res = await ref.current?.executeJavaScript(scrapeSearchScript, true)
           const clean = (res && Array.isArray(res.items) ? res.items : []).filter(v => v?.id && v?.title)
           if (clean.length) {
-            liveDashboardRows[key] = clean
+            liveDashboardRows[key] = key === 'playlists' ? clean.map(i => ({ ...i, type: 'playlist' })) : clean
             emitPlayerStatus()
             return
           }
@@ -1201,11 +1203,12 @@ function YouTubeDashboard() {
   const localRecent = Array.isArray(history) ? history.slice(0, 18) : []
   const searchList = Array.isArray(searches) ? searches.slice(0, 18) : []
   const rows = liveDashboardRows || {}
-  const recommended = (rows.recommended || []).filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
+  const homeItems = rows.recommended || []
+  const recommended = homeItems.filter(x => x.type !== 'short' && x.type !== 'playlist').slice(0, 18)
   const recent = ((rows.history || []).length ? rows.history : localRecent).slice(0, 18)
   const subscriptions = (rows.subscriptions || []).slice(0, 18)
   const watchlater = (rows.watchlater || []).slice(0, 18)
-  const shorts = (rows.shorts || []).concat(recommended.filter(x => x.type === 'short'), recent.filter(x => x.type === 'short')).slice(0, 18)
+  const shorts = (rows.shorts || []).concat(homeItems.filter(x => x.type === 'short'), recent.filter(x => x.type === 'short')).slice(0, 18)
   const playlists = (rows.playlists || []).slice(0, 18)
   const nowTitle = current?.title || localRecent.find(x => x.id === current?.videoId)?.title || current?.videoId || 'Nothing playing'
   const btn = 'rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-(--ui-text-secondary) hover:border-(--ui-accent) hover:bg-white/[0.1] hover:text-(--ui-text-primary) disabled:opacity-50'
@@ -1226,6 +1229,7 @@ function YouTubeDashboard() {
     jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: historyRef, src: cacheBust(ACCOUNT_FEEDS.history) }),
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: subsRef, src: cacheBust(ACCOUNT_FEEDS.subscriptions) }) : null,
     account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: watchLaterRef, src: cacheBust(ACCOUNT_FEEDS.watchlater) }) : null,
+    account.signedIn ? jsx('webview', { className: 'pointer-events-none absolute h-px w-px opacity-0', partition: 'persist:hermes-youtube-float-player', ref: playlistsRef, src: cacheBust(ACCOUNT_FEEDS.yourplaylists) }) : null,
     jsxs('div', { className: 'grid gap-3 rounded-2xl bg-white/[0.04] p-3 lg:grid-cols-[minmax(520px,1fr)_520px]', children: [
       jsxs('div', { className: 'flex min-w-0 gap-4', children: [
         jsx('img', { alt: '', className: 'aspect-video w-52 shrink-0 rounded-xl bg-black object-cover', src: current?.thumb || (current?.videoId ? 'https://i.ytimg.com/vi/' + current.videoId + '/mqdefault.jpg' : 'https://i.ytimg.com/vi/0/mqdefault.jpg') }),
@@ -1245,7 +1249,7 @@ function YouTubeDashboard() {
       jsxs('div', { className: 'grid grid-cols-4 gap-2 self-center', children: [
         metric('Recommended', recommended.length),
         metric('History', recent.length),
-        metric('Searches', searchList.length),
+        metric('Playlists', playlists.length),
         metric('Shorts', shorts.length)
       ] })
     ] }),
@@ -1255,8 +1259,7 @@ function YouTubeDashboard() {
       shelf('Subscriptions', subscriptions, account.signedIn ? 'Loading subscriptions…' : 'Sign in to load subscriptions'),
       shelf('Watch Later', watchlater, account.signedIn ? 'Loading Watch Later…' : 'Sign in to use Watch Later'),
       shelf('Shorts', shorts, 'Shorts appear when Home or search provides them'),
-      shelf('Playlists', playlists, 'Playlist search results appear here'),
-      shelf('Search history', searchList, 'Search terms appear here', searchCard)
+      shelf('Playlists', playlists, account.signedIn ? 'Loading playlists…' : 'Sign in to load playlists')
     ] })
   ] })
 }
@@ -1300,7 +1303,7 @@ export default {
         // ponytail: different ids prevent Hermes' persisted docked tree tile from rendering the new floating contribution too.
         id: playerId(placement),
         area: 'panes',
-        title: 'YouTube v3.78 ★',
+        title: 'YouTube v3.79 ★',
         data: playerData(placement),
         render: () => jsx(YouTubeFloat, { pane: true })
       })
